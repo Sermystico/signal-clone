@@ -1,56 +1,102 @@
 "use client";
 
+import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import Sidebar from "@/components/sidebar/Sidebar";
+import ChatPane from "@/components/chat/ChatPane";
+import ProfileModal from "@/components/profile/ProfileModal";
+import { mockConversations } from "@/data/mockData";
+import { MockConversation, MockMessage } from "@/types";
 
 export default function Home() {
   const { user, logout, loading } = useAuth();
+  
+  // Local state for UI Shell Mock functionality
+  const [conversations, setConversations] = useState<MockConversation[]>(mockConversations);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
 
+  // Handle local mock sending of a message
+  const handleSendMessage = (conversationId: string, content: string) => {
+    const newMessage: MockMessage = {
+      id: `m_new_${Date.now()}`,
+      content,
+      senderId: 0, // 0 represents the current user
+      timestamp: new Date().toISOString(),
+      status: 'sending'
+    };
+
+    setConversations(prev => prev.map(conv => {
+      if (conv.id === conversationId) {
+        return {
+          ...conv,
+          messages: [...conv.messages, newMessage],
+          lastActivity: newMessage.timestamp
+        };
+      }
+      return conv;
+    }));
+    
+    // Simulate message delivery status change after 1s to make the shell interactive
+    setTimeout(() => {
+      setConversations(prev => prev.map(conv => {
+        if (conv.id === conversationId) {
+          const updatedMessages = conv.messages.map(m => 
+            m.id === newMessage.id ? { ...m, status: 'delivered' as const } : m
+          );
+          return { ...conv, messages: updatedMessages };
+        }
+        return conv;
+      }));
+    }, 1000);
+  };
+
+  // Global loading state while checking session
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
   }
 
+  // Prevent rendering if unauthenticated, the AuthContext redirects automatically
   if (!user) return null;
 
-  return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full text-center">
-        <img 
-          src={user.avatar_url || "https://i.pravatar.cc/150"} 
-          alt={user.display_name} 
-          className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-blue-100 object-cover"
-        />
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">Welcome, {user.display_name}!</h1>
-        <p className="text-gray-600 mb-6">@{user.username}</p>
-        
-        <div className="p-4 bg-gray-50 rounded-lg mb-6 text-left border border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Profile Info</h2>
-          <div className="space-y-2">
-            <p className="text-sm text-gray-700 flex justify-between">
-              <span className="font-medium text-gray-500">Status:</span> 
-              <span className="text-green-600 font-medium">Online</span>
-            </p>
-            <p className="text-sm text-gray-700 flex justify-between">
-              <span className="font-medium text-gray-500">User ID:</span> 
-              <span>{user.id}</span>
-            </p>
-            <p className="text-sm text-gray-700 flex justify-between">
-              <span className="font-medium text-gray-500">Joined:</span> 
-              <span>{new Date(user.created_at).toLocaleDateString()}</span>
-            </p>
-          </div>
-        </div>
+  const activeConversation = conversations.find(c => c.id === activeId) || null;
 
-        <button 
-          onClick={logout}
-          className="w-full bg-gray-800 text-white py-2 px-4 rounded-md hover:bg-gray-900 transition-colors focus:ring-2 focus:ring-offset-2 focus:ring-gray-900"
-        >
-          Logout
-        </button>
+  return (
+    <div className="h-screen w-full flex bg-white overflow-hidden text-gray-900">
+      
+      {/* Sidebar container: hidden on mobile if a chat is active */}
+      <div className={`${activeId ? 'hidden md:block' : 'block'} w-full md:w-[350px] lg:w-[400px] flex-shrink-0 h-full`}>
+        <Sidebar 
+          user={user}
+          conversations={conversations}
+          activeConversationId={activeId}
+          onSelectConversation={(id) => setActiveId(id)}
+          onOpenProfile={() => setShowProfile(true)}
+        />
       </div>
+
+      {/* Chat container: hidden on mobile if NO chat is active */}
+      <div className={`${!activeId ? 'hidden md:flex' : 'flex'} flex-1 h-full min-w-0`}>
+        <ChatPane 
+          conversation={activeConversation}
+          onBack={() => setActiveId(null)}
+          onSendMessage={handleSendMessage}
+        />
+      </div>
+
+      {/* Profile/Settings Modal Overlay */}
+      {showProfile && (
+        <ProfileModal 
+          user={user} 
+          onClose={() => setShowProfile(false)} 
+          onLogout={logout} 
+        />
+      )}
+      
     </div>
   );
 }
