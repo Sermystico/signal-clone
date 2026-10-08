@@ -1,14 +1,33 @@
-import React from 'react';
-import { X, Bell, Lock, PaintBucket, Smartphone, LogOut } from 'lucide-react';
+import React, { useRef } from 'react';
+import { X, Bell, Lock, PaintBucket, Smartphone, LogOut, Camera, Trash2 } from 'lucide-react';
+import Avatar from '@/components/ui/Avatar';
 
 interface ProfileModalProps {
   user: any;
   onClose: () => void;
   onLogout: () => void;
+  onUpdateAvatar: (url: string | null) => void;
 }
 
-export default function ProfileModal({ user, onClose, onLogout }: ProfileModalProps) {
+export default function ProfileModal({ user, onClose, onLogout, onUpdateAvatar }: ProfileModalProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   if (!user) return null;
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file);
+      onUpdateAvatar(url);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    onUpdateAvatar(null);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4">
@@ -25,12 +44,39 @@ export default function ProfileModal({ user, onClose, onLogout }: ProfileModalPr
         {/* Scrollable Content */}
         <div className="overflow-y-auto p-0">
           <div className="flex flex-col items-center p-6 bg-gray-50 border-b border-gray-200">
-            <img 
-              src={user.avatar_url || "https://i.pravatar.cc/150"} 
-              alt="Profile" 
-              className="w-24 h-24 rounded-full object-cover shadow-sm mb-4 border-4 border-white"
-            />
-            <h3 className="text-xl font-bold text-gray-900">{user.display_name}</h3>
+            <div className="relative group mb-2">
+              <Avatar 
+                url={user.avatar_url} 
+                name={user.display_name || user.username} 
+                size={96} 
+                className="shadow-sm border-4 border-white"
+              />
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full shadow-md hover:bg-blue-700 transition-colors"
+                title="Change profile photo"
+              >
+                <Camera size={16} />
+              </button>
+              <input 
+                type="file" 
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="image/*"
+                className="hidden"
+              />
+            </div>
+            
+            {user.avatar_url && (
+              <button 
+                onClick={handleRemovePhoto}
+                className="text-red-500 text-xs flex items-center mb-3 hover:text-red-700 transition-colors"
+              >
+                <Trash2 size={12} className="mr-1" /> Remove photo
+              </button>
+            )}
+
+            <h3 className="text-xl font-bold text-gray-900 mt-1">{user.display_name}</h3>
             <p className="text-gray-500 text-sm">@{user.username}</p>
           </div>
 

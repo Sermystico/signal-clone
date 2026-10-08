@@ -5,8 +5,7 @@ export const mockConversations: MockConversation[] = [
   {
     id: "c1",
     type: "direct",
-    name: "Alice",
-    avatar: "https://i.pravatar.cc/150?u=alice",
+    name: "Alice Smith",
     lastActivity: new Date(Date.now() - 1000 * 60 * 5).toISOString(), // 5 mins ago
     unreadCount: 2,
     isOnline: true,
@@ -28,8 +27,7 @@ export const mockConversations: MockConversation[] = [
   {
     id: "c2",
     type: "direct",
-    name: "Bob",
-    avatar: "https://i.pravatar.cc/150?u=bob",
+    name: "Bob Jones",
     lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
     unreadCount: 0,
     isOnline: false,
@@ -47,7 +45,6 @@ export const mockConversations: MockConversation[] = [
     id: "c3",
     type: "group",
     name: "Secret Agents",
-    avatar: "https://i.pravatar.cc/150?u=group",
     lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
     unreadCount: 0,
     messages: [

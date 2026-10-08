@@ -12,7 +12,7 @@ export interface MockConversation {
   id: string;
   type: 'direct' | 'group';
   name: string;
-  avatar: string;
+  avatar?: string | null;
   lastActivity: string;
   unreadCount: number;
   messages: MockMessage[];

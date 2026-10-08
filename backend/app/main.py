@@ -17,8 +17,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from .routers import auth
+from .routers import auth, users, contacts, conversations, messages, ws
+
 app.include_router(auth.router)
+app.include_router(users.router)
+app.include_router(contacts.router)
+app.include_router(conversations.router)
+app.include_router(messages.router)
+app.include_router(ws.router)
 
 @app.get("/health")
 def health_check():
