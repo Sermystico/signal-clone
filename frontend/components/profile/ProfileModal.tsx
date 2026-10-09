@@ -1,9 +1,10 @@
 import React, { useRef } from 'react';
 import { X, Bell, Lock, PaintBucket, Smartphone, LogOut, Camera, Trash2 } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
+import { User } from '@/contexts/AuthContext';
 
 interface ProfileModalProps {
-  user: any;
+  user: User;
   onClose: () => void;
   onLogout: () => void;
   onUpdateAvatar: (url: string | null) => void;

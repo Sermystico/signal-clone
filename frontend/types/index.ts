@@ -1,7 +1,7 @@
 export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read';
 
 export interface MockMessage {
-  id: string;
+  id: number | string;
   content: string;
   senderId: number; // 0 represents the current authenticated user
   timestamp: string;
@@ -9,7 +9,7 @@ export interface MockMessage {
 }
 
 export interface MockConversation {
-  id: string;
+  id: number | string;
   type: 'direct' | 'group';
   name: string;
   avatar?: string | null;

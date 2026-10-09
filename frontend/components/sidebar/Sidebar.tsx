@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { Search, Edit, MoreVertical } from 'lucide-react';
 import { MockConversation } from '@/types';
+import { User } from '@/contexts/AuthContext';
 import Avatar from '@/components/ui/Avatar';
 
 interface SidebarProps {
-  user: any; 
+  user: User; 
   conversations: MockConversation[];
-  activeConversationId: string | null;
-  onSelectConversation: (id: string) => void;
+  activeConversationId: number | string | null;
+  onSelectConversation: (id: number | string) => void;
   onOpenProfile: () => void;
   className?: string;
 }

@@ -1,61 +1,207 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import Sidebar from "@/components/sidebar/Sidebar";
 import ChatPane from "@/components/chat/ChatPane";
 import ProfileModal from "@/components/profile/ProfileModal";
 import Avatar from "@/components/ui/Avatar";
-import { mockConversations } from "@/data/mockData";
-import { MockConversation, MockMessage } from "@/types";
+import { MockConversation, MockMessage, MessageStatus } from "@/types";
+
+interface APIMessage {
+  id: number;
+  content: string;
+  sender_id: number;
+  created_at: string;
+  status: string;
+  conversation_id?: number;
+}
+
+interface APIConversation {
+  id: number;
+  type: string;
+  updated_at: string;
+  unread_count: number;
+  last_message?: APIMessage;
+  members?: {
+    user_id: number;
+    user: {
+      display_name: string;
+      avatar_url: string | null;
+      is_online: boolean;
+    };
+  }[];
+}
+
+const mapMessage = (msg: APIMessage): MockMessage => ({
+  id: msg.id,
+  content: msg.content,
+  senderId: msg.sender_id,
+  timestamp: msg.created_at,
+  status: msg.status as MessageStatus,
+});
+
+const mapConversation = (conv: APIConversation, currentUserId: number): MockConversation => {
+  const otherMember = conv.members?.find((m) => m.user_id !== currentUserId);
+  const name = otherMember ? otherMember.user.display_name : 'Group Chat';
+  const avatar = otherMember ? otherMember.user.avatar_url : null;
+  const isOnline = otherMember ? otherMember.user.is_online : false;
+  
+  return {
+    id: conv.id,
+    type: conv.type as 'direct' | 'group',
+    name,
+    avatar,
+    lastActivity: conv.updated_at,
+    unreadCount: conv.unread_count || 0,
+    messages: conv.last_message ? [mapMessage(conv.last_message)] : [],
+    isOnline,
+  };
+};
 
 export default function Home() {
-  const { user, logout, loading } = useAuth();
+  const { user, token, logout, loading } = useAuth();
   
-  // Local state for UI Shell Mock functionality
-  const [conversations, setConversations] = useState<MockConversation[]>(mockConversations);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [showProfile, setShowProfile] = useState(false);
+  const [conversations, setConversations] = useState<MockConversation[]>([]);
+  const [activeId, setActiveId] = useState<number | string | null>(null);
+  const activeIdRef = useRef(activeId);
   
-  // Local preview state for Avatar until Phase 4 Backend implementation
-  const [localAvatarUrl, setLocalAvatarUrl] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    activeIdRef.current = activeId;
+  }, [activeId]);
 
-  // Handle local mock sending of a message
-  const handleSendMessage = (conversationId: string, content: string) => {
+  const [showProfile, setShowProfile] = useState(false);
+  const [localAvatarUrl, setLocalAvatarUrl] = useState<string | null | undefined>(undefined);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+  useEffect(() => {
+    if (!user || !token) return;
+
+    const fetchConversations = async () => {
+      try {
+        const res = await fetch(`${API_URL}/conversations/`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setConversations(data.map((c: APIConversation) => mapConversation(c, user.id)));
+        }
+      } catch (err) {
+        console.error("Failed to fetch conversations", err);
+      }
+    };
+
+    fetchConversations();
+
+    const wsUrl = API_URL.replace('http', 'ws') + `/ws?token=${token}`;
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'message.new') {
+        const newMsg = mapMessage(data.data);
+        const convId = data.data.conversation_id;
+        
+        setConversations(prev => {
+          const exists = prev.find(c => c.id === convId);
+          if (!exists) {
+            fetchConversations();
+            return prev;
+          }
+          return prev.map(conv => {
+            if (conv.id === convId) {
+              const hasMsg = conv.messages.some(m => m.id === newMsg.id);
+              return {
+                ...conv,
+                messages: hasMsg ? conv.messages : [...conv.messages, newMsg],
+                lastActivity: newMsg.timestamp,
+                unreadCount: conv.id === activeIdRef.current ? 0 : conv.unreadCount + 1
+              };
+            }
+            return conv;
+          });
+        });
+      }
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [user, token, API_URL]);
+
+  useEffect(() => {
+    if (!activeId || !user || !token) return;
+
+    const fetchMessages = async () => {
+      try {
+        const res = await fetch(`${API_URL}/messages/${activeId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const msgs = data.map(mapMessage);
+          setConversations(prev => prev.map(c => 
+            c.id === activeId ? { ...c, messages: msgs, unreadCount: 0 } : c
+          ));
+        }
+      } catch (err) {
+        console.error("Failed to fetch messages", err);
+      }
+    };
+    fetchMessages();
+  }, [activeId, user, token, API_URL]);
+
+  const handleSendMessage = async (conversationId: number | string, content: string) => {
+    if (!token || !user) return;
+    
+    const tempId = `m_new_${Date.now()}`;
     const newMessage: MockMessage = {
-      id: `m_new_${Date.now()}`,
+      id: tempId,
       content,
-      senderId: 0, // 0 represents the current user
+      senderId: user.id,
       timestamp: new Date().toISOString(),
       status: 'sending'
     };
 
     setConversations(prev => prev.map(conv => {
       if (conv.id === conversationId) {
-        return {
-          ...conv,
-          messages: [...conv.messages, newMessage],
-          lastActivity: newMessage.timestamp
-        };
+        return { ...conv, messages: [...conv.messages, newMessage], lastActivity: newMessage.timestamp };
       }
       return conv;
     }));
-    
-    // Simulate message delivery status change after 1s to make the shell interactive
-    setTimeout(() => {
-      setConversations(prev => prev.map(conv => {
-        if (conv.id === conversationId) {
-          const updatedMessages = conv.messages.map(m => 
-            m.id === newMessage.id ? { ...m, status: 'delivered' as const } : m
-          );
-          return { ...conv, messages: updatedMessages };
-        }
-        return conv;
-      }));
-    }, 1000);
+
+    try {
+      const res = await fetch(`${API_URL}/messages/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ conversation_id: conversationId, content })
+      });
+      
+      if (res.ok) {
+        const savedMsg = await res.json();
+        const mapped = mapMessage(savedMsg);
+        setConversations(prev => prev.map(conv => {
+          if (conv.id === conversationId) {
+            return {
+              ...conv,
+              messages: conv.messages.map(m => m.id === tempId ? mapped : m),
+              lastActivity: mapped.timestamp
+            };
+          }
+          return conv;
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to send message", err);
+    }
   };
 
-  // Global loading state while checking session
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50">
@@ -64,19 +210,14 @@ export default function Home() {
     );
   }
 
-  // Prevent rendering if unauthenticated, the AuthContext redirects automatically
   if (!user) return null;
 
-  // The effectively active avatar for the current user
   const activeAvatarUrl = localAvatarUrl !== undefined ? localAvatarUrl : user.avatar_url;
   const userWithAvatar = { ...user, avatar_url: activeAvatarUrl };
-
   const activeConversation = conversations.find(c => c.id === activeId) || null;
 
   return (
     <div className="h-screen w-full flex bg-white overflow-hidden text-gray-900 font-sans">
-      
-      {/* Thin Left Rail (Desktop Only) */}
       <div className="hidden md:flex flex-col w-[64px] bg-[#F3F3F3] border-r border-gray-200 h-full py-3 items-center justify-between z-30 flex-shrink-0">
         <div className="flex flex-col gap-3 items-center w-full">
           <button onClick={() => setShowProfile(true)} className="focus:outline-none mb-2 mt-1 hover:opacity-80 transition-opacity">
@@ -101,8 +242,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-
-      {/* Sidebar container: hidden on mobile if a chat is active */}
       <div className={`${activeId ? 'hidden md:block' : 'block'} w-full md:w-[300px] lg:w-[340px] flex-shrink-0 h-full z-20 shadow-sm md:shadow-none`}>
         <Sidebar 
           user={userWithAvatar}
@@ -112,8 +251,6 @@ export default function Home() {
           onOpenProfile={() => setShowProfile(true)}
         />
       </div>
-
-      {/* Chat container: hidden on mobile if NO chat is active */}
       <div className={`${!activeId ? 'hidden md:flex' : 'flex'} flex-1 h-full min-w-0`}>
         <ChatPane 
           conversation={activeConversation}
@@ -121,8 +258,6 @@ export default function Home() {
           onSendMessage={handleSendMessage}
         />
       </div>
-
-      {/* Profile/Settings Modal Overlay */}
       {showProfile && (
         <ProfileModal 
           user={userWithAvatar} 
@@ -131,7 +266,6 @@ export default function Home() {
           onUpdateAvatar={(url) => setLocalAvatarUrl(url)}
         />
       )}
-      
     </div>
   );
 }

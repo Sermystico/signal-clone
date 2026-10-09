@@ -1,14 +1,14 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 
-interface User {
+export interface User {
   id: number;
   username: string;
   phone?: string;
   display_name: string;
-  avatar_url?: string;
+  avatar_url?: string | null;
   is_online: boolean;
   last_seen: string;
   created_at: string;
@@ -31,27 +31,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Load the current user's profile if a token exists in local storage
-  useEffect(() => {
-    const storedToken = localStorage.getItem('token');
-    if (storedToken) {
-      setToken(storedToken);
-      fetchUser(storedToken);
-    } else {
-      setLoading(false);
-      if (pathname !== '/login' && pathname !== '/register') {
-        router.push('/login');
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!loading && !user && pathname !== '/login' && pathname !== '/register') {
-      router.push('/login');
-    }
-  }, [user, loading, pathname, router]);
-
-  const fetchUser = async (authToken: string) => {
+  const fetchUser = useCallback(async (authToken: string) => {
     try {
       const res = await fetch('http://localhost:8000/auth/me', {
         headers: {
@@ -62,7 +42,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const userData = await res.json();
         setUser(userData);
       } else {
-        // Token might be invalid or expired
         localStorage.removeItem('token');
         setToken(null);
         setUser(null);
@@ -75,7 +54,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pathname, router]);
+
+  useEffect(() => {
+    const storedToken = localStorage.getItem('token');
+    if (storedToken) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setToken(storedToken);
+      fetchUser(storedToken);
+    } else {
+      setLoading(false);
+      if (pathname !== '/login' && pathname !== '/register') {
+        router.push('/login');
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!loading && !user && pathname !== '/login' && pathname !== '/register') {
+      router.push('/login');
+    }
+  }, [user, loading, pathname, router]);
 
   const login = (newToken: string) => {
     localStorage.setItem('token', newToken);

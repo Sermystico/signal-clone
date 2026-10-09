@@ -6,7 +6,7 @@ import Avatar from '@/components/ui/Avatar';
 interface ChatPaneProps {
   conversation: MockConversation | null;
   onBack: () => void;
-  onSendMessage: (conversationId: string, content: string) => void;
+  onSendMessage: (conversationId: number | string, content: string) => void;
   className?: string;
 }
 
@@ -43,7 +43,7 @@ export default function ChatPane({ conversation, onBack, onSendMessage, classNam
           </div>
           <h2 className="text-[22px] font-semibold text-gray-900 mb-2">Welcome to Signal</h2>
           <p className="text-gray-500 text-[14px]">
-            See <span className="text-[#3A76F0] cursor-pointer hover:underline">what's new</span> in this update
+            See <span className="text-[#3A76F0] cursor-pointer hover:underline">what&apos;s new</span> in this update
           </p>
         </div>
         <div className="absolute bottom-6 text-[13px] text-gray-400">
@@ -111,7 +111,7 @@ export default function ChatPane({ conversation, onBack, onSendMessage, classNam
           </div>
         </div>
 
-        {conversation.messages.map((msg, idx) => {
+        {conversation.messages.map((msg) => {
           const isMine = msg.senderId === 0;
           const showSenderName = conversation.type === 'group' && !isMine;
           

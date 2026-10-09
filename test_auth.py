@@ -1,14 +1,16 @@
 import urllib.request
 import urllib.error
 import json
+import time
 
 base_url = "http://localhost:8000"
+test_username = f"testuser_{int(time.time())}"
 
 def test_api():
     print("Testing Registration with invalid OTP...")
     req = urllib.request.Request(
         f"{base_url}/auth/register",
-        data=json.dumps({"username": "testuser2", "display_name": "Test", "otp": "00000"}).encode(),
+        data=json.dumps({"username": test_username, "display_name": "Test", "otp": "00000"}).encode(),
         headers={"Content-Type": "application/json"}
     )
     try:
@@ -20,7 +22,7 @@ def test_api():
     print("Testing Registration with valid OTP...")
     req = urllib.request.Request(
         f"{base_url}/auth/register",
-        data=json.dumps({"username": "testuser2", "display_name": "Test User", "otp": "123456"}).encode(),
+        data=json.dumps({"username": test_username, "display_name": "Test User", "otp": "123456"}).encode(),
         headers={"Content-Type": "application/json"}
     )
     try:
@@ -35,7 +37,7 @@ def test_api():
     print("Testing Login with invalid credentials...")
     req = urllib.request.Request(
         f"{base_url}/auth/login",
-        data=json.dumps({"username": "testuser2", "otp": "wrong"}).encode(),
+        data=json.dumps({"username": test_username, "otp": "wrong"}).encode(),
         headers={"Content-Type": "application/json"}
     )
     try:
@@ -47,7 +49,7 @@ def test_api():
     print("Testing Login with valid credentials...")
     req = urllib.request.Request(
         f"{base_url}/auth/login",
-        data=json.dumps({"username": "testuser2", "otp": "123456"}).encode(),
+        data=json.dumps({"username": test_username, "otp": "123456"}).encode(),
         headers={"Content-Type": "application/json"}
     )
     try:

@@ -22,6 +22,7 @@ export default function Avatar({ url, name, size = 40, className = "" }: AvatarP
   };
 
   if (url) {
+    // eslint-disable-next-line @next/next/no-img-element
     return (
       <img 
         src={url} 
