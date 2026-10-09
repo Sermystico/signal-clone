@@ -6,38 +6,51 @@ import Avatar from '@/components/ui/Avatar';
 
 interface SidebarProps {
   user: User; 
+  activeTab: string;
   conversations: MockConversation[];
   activeConversationId: number | string | null;
   onSelectConversation: (id: number | string) => void;
   onOpenProfile: () => void;
   onNewChat: () => void;
+  showTabsButton?: boolean;
+  onToggleTabs?: () => void;
   className?: string;
 }
 
+const ensureUTC = (ts: string) => ts.endsWith('Z') || ts.includes('+') ? ts : ts + 'Z';
+
 export default function Sidebar({ 
-  user, 
+  user,
+  activeTab,
   conversations, 
   activeConversationId, 
   onSelectConversation,
   onOpenProfile,
   onNewChat,
+  showTabsButton,
+  onToggleTabs,
   className = ""
 }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
 
-  const filteredConversations = conversations.filter(c => 
-    c.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredConversations = conversations.filter(c => {
+    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesUnread = showUnreadOnly ? c.unreadCount > 0 : true;
+    return matchesSearch && matchesUnread;
+  });
 
   return (
     <div className={`flex flex-col bg-white border-r border-gray-200 h-full ${className}`}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-white">
+      <div className="flex items-center justify-between px-4 py-3 bg-white h-[60px]">
         <div className="flex items-center gap-3">
-          <button onClick={onOpenProfile} className="focus:outline-none flex-shrink-0 rounded-full hover:opacity-80 transition-opacity">
-            <Avatar url={user?.avatar_url} name={user?.display_name || user?.username || "User"} size={36} />
-          </button>
-          <h1 className="text-xl font-bold text-gray-900">Chats</h1>
+          {showTabsButton && (
+            <button onClick={onToggleTabs} title="Show tabs" aria-label="Show tabs" className="focus:outline-none p-2 -ml-2 rounded-lg hover:bg-gray-100 transition-colors">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-700"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </button>
+          )}
+          <h2 className="text-xl font-bold text-gray-900 capitalize">{activeTab}</h2>
         </div>
         <div className="flex gap-1 text-gray-600">
           <button onClick={onNewChat} className="p-2 hover:bg-gray-100 rounded-full transition-colors" title="New Chat">
@@ -62,7 +75,11 @@ export default function Sidebar({
               className="w-full bg-[#F2F2F2] rounded-lg py-1.5 pl-9 pr-4 text-[15px] focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-900 placeholder-gray-500"
             />
           </div>
-          <button className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0">
+          <button 
+            onClick={() => setShowUnreadOnly(!showUnreadOnly)} 
+            className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${showUnreadOnly ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100'}`}
+            title={showUnreadOnly ? "Show all" : "Show unread only"}
+          >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
           </button>
         </div>
@@ -93,12 +110,12 @@ export default function Sidebar({
                       {conv.name}
                     </h3>
                     <span className={`text-[13px] flex-shrink-0 ml-2 ${hasUnread ? 'font-medium text-blue-600' : 'text-gray-500'}`}>
-                      {new Date(conv.lastActivity).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                      {new Date(ensureUTC(conv.lastActivity)).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <p className={`text-[14px] truncate mr-2 ${hasUnread ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>
-                      {lastMsg ? (lastMsg.senderId === 0 ? `You: ${lastMsg.content}` : lastMsg.content) : "No messages yet"}
+                      {lastMsg ? (lastMsg.senderId === user.id ? `You: ${lastMsg.content}` : lastMsg.content) : "No messages yet"}
                     </p>
                     {hasUnread && (
                       <span className="bg-blue-600 text-white text-[12px] font-bold rounded-full px-2 py-0.5 min-w-[20px] text-center flex-shrink-0">

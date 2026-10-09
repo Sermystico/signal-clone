@@ -12,22 +12,50 @@ interface ProfileModalProps {
 
 export default function ProfileModal({ user, onClose, onLogout, onUpdateAvatar }: ProfileModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   if (!user) return null;
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && file.type.startsWith('image/')) {
-      const url = URL.createObjectURL(file);
-      onUpdateAvatar(url);
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const res = await fetch(`${API_URL}/users/avatar`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: formData
+        });
+        if (res.ok) {
+          const updatedUser = await res.json();
+          onUpdateAvatar(updatedUser.avatar_url);
+        }
+      } catch (err) {
+        console.error("Failed to upload avatar", err);
+      }
     }
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  const handleRemovePhoto = () => {
-    onUpdateAvatar(null);
+  const handleRemovePhoto = async () => {
+    try {
+      const res = await fetch(`${API_URL}/users/avatar`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (res.ok) {
+        onUpdateAvatar(null);
+      }
+    } catch (err) {
+      console.error("Failed to remove avatar", err);
+    }
   };
 
   return (

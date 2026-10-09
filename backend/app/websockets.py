@@ -29,4 +29,8 @@ class ConnectionManager:
                     # Ignore errors for disconnected sockets
                     pass
 
+    async def broadcast(self, message: dict):
+        for user_id in list(self.active_connections.keys()):
+            await self.send_personal_message(message, user_id)
+
 manager = ConnectionManager()

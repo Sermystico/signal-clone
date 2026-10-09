@@ -8,6 +8,7 @@ import ProfileModal from "@/components/profile/ProfileModal";
 import NewChatModal from "@/components/chat/NewChatModal";
 import Avatar from "@/components/ui/Avatar";
 import { MockConversation, MockMessage, MessageStatus } from "@/types";
+import { Menu, MessageCircle, Phone, Layers, Settings } from "lucide-react";
 
 interface APIMessage {
   id: number;
@@ -24,6 +25,11 @@ interface APIConversation {
   updated_at: string;
   unread_count: number;
   last_message?: APIMessage;
+  group?: {
+    id: number;
+    name: string;
+    avatar_url: string | null;
+  };
   members?: {
     user_id: number;
     user: {
@@ -44,24 +50,27 @@ const mapMessage = (msg: APIMessage): MockMessage => ({
 
 const mapConversation = (conv: APIConversation, currentUserId: number): MockConversation => {
   const otherMember = conv.members?.find((m) => m.user_id !== currentUserId);
-  const name = otherMember ? otherMember.user.display_name : 'Group Chat';
-  const avatar = otherMember ? otherMember.user.avatar_url : null;
-  const isOnline = otherMember ? otherMember.user.is_online : false;
+  const convType = conv.type || 'direct';
+  const name = convType === 'group' && conv.group ? conv.group.name : (otherMember ? otherMember.user.display_name : 'Chat');
+  const avatar = convType === 'group' && conv.group ? conv.group.avatar_url : (otherMember ? otherMember.user.avatar_url : null);
+  const isOnline = convType === 'direct' ? (otherMember ? otherMember.user.is_online : false) : false;
+  const otherUserId = convType === 'direct' ? (otherMember ? otherMember.user_id : undefined) : undefined;
   
   return {
     id: conv.id,
-    type: conv.type as 'direct' | 'group',
+    type: convType as 'direct' | 'group',
     name,
     avatar,
     lastActivity: conv.updated_at,
     unreadCount: conv.unread_count || 0,
     messages: conv.last_message ? [mapMessage(conv.last_message)] : [],
     isOnline,
+    otherUserId,
   };
 };
 
 export default function Home() {
-  const { user, token, logout, loading } = useAuth();
+  const { user, token, logout, loading, updateUser } = useAuth();
   
   const [conversations, setConversations] = useState<MockConversation[]>([]);
   const [activeId, setActiveId] = useState<number | string | null>(null);
@@ -73,6 +82,8 @@ export default function Home() {
 
   const [showProfile, setShowProfile] = useState(false);
   const [showNewChat, setShowNewChat] = useState(false);
+  const [showTabs, setShowTabs] = useState(true);
+  const [activeTab, setActiveTab] = useState('chats');
   const [localAvatarUrl, setLocalAvatarUrl] = useState<string | null | undefined>(undefined);
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -97,40 +108,88 @@ export default function Home() {
 
     fetchConversations();
 
-    const wsUrl = API_URL.replace('http', 'ws') + `/ws?token=${token}`;
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+    let ws: WebSocket;
+    let reconnectTimer: NodeJS.Timeout;
 
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'message.new') {
-        const newMsg = mapMessage(data.data);
-        const convId = data.data.conversation_id;
-        
-        setConversations(prev => {
-          const exists = prev.find(c => c.id === convId);
-          if (!exists) {
-            fetchConversations();
-            return prev;
-          }
-          return prev.map(conv => {
-            if (conv.id === convId) {
-              const hasMsg = conv.messages.some(m => m.id === newMsg.id);
+    const connectWs = () => {
+      const wsUrl = API_URL.replace('http', 'ws') + `/ws?token=${token}`;
+      ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'message.new') {
+          const payload = data.payload || data.data; // support both just in case
+          const newMsg = mapMessage(payload);
+          const convId = payload.conversation_id;
+          
+          setConversations(prev => {
+            const exists = prev.find(c => c.id === convId);
+            if (!exists) {
+              fetchConversations();
+              return prev;
+            }
+            return prev.map(conv => {
+              if (conv.id === convId) {
+                const hasMsg = conv.messages.some(m => m.id === newMsg.id);
+                const isViewing = conv.id === activeIdRef.current;
+                
+                if (isViewing && newMsg.senderId !== user.id) {
+                    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                        wsRef.current.send(JSON.stringify({ 
+                            type: 'message.read', 
+                            payload: { message_id: newMsg.id, conversation_id: convId }
+                        }));
+                    }
+                }
+
+                return {
+                  ...conv,
+                  messages: hasMsg ? conv.messages : [...conv.messages, newMsg],
+                  lastActivity: newMsg.timestamp,
+                  unreadCount: isViewing ? 0 : conv.unreadCount + (newMsg.senderId !== user.id ? 1 : 0)
+                };
+              }
+              return conv;
+            });
+          });
+        } else if (data.type === 'message.status') {
+          const { message_id, conversation_id, status } = data.payload;
+          setConversations(prev => prev.map(conv => {
+            if (conv.id === conversation_id) {
               return {
                 ...conv,
-                messages: hasMsg ? conv.messages : [...conv.messages, newMsg],
-                lastActivity: newMsg.timestamp,
-                unreadCount: conv.id === activeIdRef.current ? 0 : conv.unreadCount + 1
+                messages: conv.messages.map(m => 
+                  m.id === message_id ? { ...m, status: status as MessageStatus } : m
+                )
               };
             }
             return conv;
-          });
-        });
-      }
+          }));
+        } else if (data.type === 'presence.update') {
+          const { user_id, is_online } = data.payload;
+          setConversations(prev => prev.map(conv => {
+            if (conv.otherUserId === user_id) {
+              return { ...conv, isOnline: is_online };
+            }
+            return conv;
+          }));
+        }
+      };
+
+      ws.onclose = () => {
+        reconnectTimer = setTimeout(connectWs, 3000);
+      };
     };
 
+    connectWs();
+
     return () => {
-      ws.close();
+      clearTimeout(reconnectTimer);
+      if (ws) {
+        ws.onclose = null;
+        ws.close();
+      }
     };
   }, [user, token, API_URL]);
 
@@ -242,6 +301,22 @@ export default function Home() {
     }
   };
 
+  const handleGroupCreated = async (convId: number) => {
+    try {
+      const listRes = await fetch(`${API_URL}/conversations/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (listRes.ok && user) {
+        const listData = await listRes.json();
+        setConversations(listData.map((c: APIConversation) => mapConversation(c, user.id)));
+      }
+      setActiveId(convId);
+      setShowNewChat(false);
+    } catch (err) {
+      console.error("Failed to load group conversation", err);
+    }
+  };
+
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50">
@@ -258,42 +333,73 @@ export default function Home() {
 
   return (
     <div className="h-screen w-full flex bg-white overflow-hidden text-gray-900 font-sans">
-      <div className="hidden md:flex flex-col w-[64px] bg-[#F3F3F3] border-r border-gray-200 h-full py-3 items-center justify-between z-30 flex-shrink-0">
-        <div className="flex flex-col gap-3 items-center w-full">
-          <button tabIndex={-1} className="focus:outline-none mb-2 mt-1 hover:opacity-80 transition-opacity">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-700"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-          </button>
-          <div className="p-2.5 bg-white rounded-xl cursor-pointer shadow-sm text-gray-900">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zm-1-11a1 1 0 1 0 0 2h2a1 1 0 1 0 0-2h-2z" /></svg>
+      
+      {/* Navigation Rail */}
+      {showTabs && (
+        <div className="hidden md:flex flex-col w-[60px] bg-gray-50 border-r border-gray-200 h-full py-3 items-center justify-between z-30 flex-shrink-0">
+          <div className="flex flex-col gap-4 items-center w-full">
+            <button 
+              onClick={() => setShowTabs(false)} 
+              title={showTabs ? "Hide tabs" : "Show tabs"}
+              aria-label={showTabs ? "Hide tabs" : "Show tabs"}
+              className="p-2 hover:bg-gray-200 rounded-lg text-gray-700 transition-colors focus:outline-none"
+            >
+              <Menu size={20} />
+            </button>
+            <button 
+              onClick={() => setActiveTab('chats')}
+              title="Chats"
+              aria-label="Chats"
+              className={`p-2 rounded-lg transition-colors ${activeTab === 'chats' ? 'bg-gray-200 text-gray-900' : 'hover:bg-gray-200 text-gray-600'}`}
+            >
+              <MessageCircle size={20} />
+            </button>
+            <button 
+              onClick={() => setActiveTab('calls')}
+              title="Calls"
+              aria-label="Calls"
+              className={`p-2 rounded-lg transition-colors ${activeTab === 'calls' ? 'bg-gray-200 text-gray-900' : 'hover:bg-gray-200 text-gray-600'}`}
+            >
+              <Phone size={20} />
+            </button>
+            <button 
+              onClick={() => setActiveTab('stories')}
+              title="Stories"
+              aria-label="Stories"
+              className={`p-2 rounded-lg transition-colors ${activeTab === 'stories' ? 'bg-gray-200 text-gray-900' : 'hover:bg-gray-200 text-gray-600'}`}
+            >
+              <Layers size={20} />
+            </button>
           </div>
-          <div className="p-2.5 hover:bg-gray-200 rounded-xl cursor-pointer text-gray-700 transition-colors">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-          </div>
-          <div className="p-2.5 hover:bg-gray-200 rounded-xl cursor-pointer text-gray-700 transition-colors">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><rect x="7" y="7" width="3" height="9"></rect><rect x="14" y="7" width="3" height="5"></rect></svg>
+          <div className="flex flex-col gap-4 items-center w-full">
+            <button 
+              onClick={() => setShowProfile(true)} 
+              title="Settings"
+              aria-label="Settings"
+              className="p-2 hover:bg-gray-200 rounded-lg text-gray-700 transition-colors focus:outline-none"
+            >
+              <Settings size={20} />
+            </button>
           </div>
         </div>
-        <div className="flex flex-col gap-3 items-center w-full">
-          <button tabIndex={-1} onClick={() => setShowProfile(true)} className="focus:outline-none mb-1">
-            <Avatar url={activeAvatarUrl} name={userWithAvatar.display_name || "User"} size={32} />
-          </button>
-          <div className="p-2.5 hover:bg-gray-200 rounded-xl cursor-pointer text-gray-700 transition-colors">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-          </div>
-        </div>
-      </div>
+      )}
+
       <div className={`${activeId ? 'hidden md:block' : 'block'} w-full md:w-[300px] lg:w-[340px] flex-shrink-0 h-full z-20 shadow-sm md:shadow-none`}>
         <Sidebar 
           user={userWithAvatar}
+          activeTab={activeTab}
           conversations={conversations}
           activeConversationId={activeId}
           onSelectConversation={(id) => setActiveId(id)}
           onOpenProfile={() => setShowProfile(true)}
           onNewChat={() => setShowNewChat(true)}
+          showTabsButton={!showTabs}
+          onToggleTabs={() => setShowTabs(true)}
         />
       </div>
       <div className={`${!activeId ? 'hidden md:flex' : 'flex'} flex-1 h-full min-w-0`}>
         <ChatPane 
+          currentUserId={user.id}
           conversation={activeConversation}
           onBack={() => setActiveId(null)}
           onSendMessage={handleSendMessage}
@@ -304,7 +410,12 @@ export default function Home() {
           user={userWithAvatar} 
           onClose={() => setShowProfile(false)} 
           onLogout={logout} 
-          onUpdateAvatar={(url) => setLocalAvatarUrl(url)}
+          onUpdateAvatar={(url) => {
+            setLocalAvatarUrl(url);
+            if (user) {
+              updateUser({ ...user, avatar_url: url });
+            }
+          }}
         />
       )}
       {showNewChat && (
@@ -312,6 +423,7 @@ export default function Home() {
           token={token as string}
           onClose={() => setShowNewChat(false)}
           onStartChat={handleStartChat}
+          onGroupCreated={handleGroupCreated}
         />
       )}
     </div>

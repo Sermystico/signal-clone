@@ -4,19 +4,22 @@ import { MockConversation } from '@/types';
 import Avatar from '@/components/ui/Avatar';
 
 interface ChatPaneProps {
+  currentUserId: number;
   conversation: MockConversation | null;
   onBack: () => void;
   onSendMessage: (conversationId: number | string, content: string) => void;
   className?: string;
 }
 
-export default function ChatPane({ conversation, onBack, onSendMessage, className = "" }: ChatPaneProps) {
+const ensureUTC = (ts: string) => ts.endsWith('Z') || ts.includes('+') ? ts : ts + 'Z';
+
+export default function ChatPane({ currentUserId, conversation, onBack, onSendMessage, className = "" }: ChatPaneProps) {
   const [message, setMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
   }, [conversation?.messages]);
 
   const handleSend = (e: React.FormEvent) => {
@@ -32,19 +35,12 @@ export default function ChatPane({ conversation, onBack, onSendMessage, classNam
       <div className={`flex flex-col items-center justify-center bg-white w-full h-full relative ${className}`}>
         <div className="flex flex-col items-center justify-center max-w-sm px-4 -mt-16">
           <div className="relative mb-6">
-            {/* Dashed outer ring */}
-            <svg width="100" height="100" viewBox="0 0 100 100" className="absolute -top-1 -left-1 text-blue-600 fill-none stroke-current stroke-[3px]" strokeDasharray="6 6">
-              <circle cx="50" cy="50" r="48" />
-            </svg>
-            {/* Solid blue bubble with tail */}
-            <svg width="92" height="92" viewBox="0 0 100 100" className="relative z-10 m-1">
-              <path d="M50 5C25.147 5 5 25.147 5 50c0 8.353 2.274 16.166 6.184 22.956L5 95l22.044-6.184C33.834 92.726 41.647 95 50 95c24.853 0 45-20.147 45-45S74.853 5 50 5z" fill="#3A76F0" />
+            <svg width="100" height="100" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="46" fill="none" stroke="#2C6BED" strokeWidth="3" strokeDasharray="6 6" />
+              <path d="M50 12 C29.013 12 12 29.013 12 50 C12 56.5 13.6 62.6 16.5 67.9 L12 88 L32.1 83.5 C37.4 86.4 43.5 88 50 88 C70.987 88 88 70.987 88 50 C88 29.013 70.987 12 50 12 Z" fill="#2C6BED" />
             </svg>
           </div>
-          <h2 className="text-[22px] font-semibold text-gray-900 mb-2">Welcome to Signal</h2>
-          <p className="text-gray-500 text-[14px]">
-            See <span className="text-[#3A76F0] cursor-pointer hover:underline">what&apos;s new</span> in this update
-          </p>
+          <h2 className="text-[22px] font-semibold text-gray-900">Welcome to Signal</h2>
         </div>
         <div className="absolute bottom-6 text-[13px] text-gray-400">
           Signal is a 501c3 nonprofit
@@ -72,10 +68,10 @@ export default function ChatPane({ conversation, onBack, onSendMessage, classNam
           </div>
         </div>
         <div className="flex gap-1 text-gray-600">
-          <button className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors"><Video size={20} /></button>
-          <button className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors hidden sm:block"><Phone size={20} /></button>
-          <button className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors"><Search size={20} /></button>
-          <button className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors"><MoreHorizontal size={20} /></button>
+          <button title="Start a video call" aria-label="Start a video call" className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"><Video size={20} /></button>
+          <button title="Start a call" aria-label="Start a call" className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors hidden sm:block focus:outline-none focus:ring-2 focus:ring-blue-500"><Phone size={20} /></button>
+          <button title="Search" aria-label="Search" className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"><Search size={20} /></button>
+          <button title="More info" aria-label="More info" className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"><MoreHorizontal size={20} /></button>
         </div>
       </div>
 
@@ -112,7 +108,7 @@ export default function ChatPane({ conversation, onBack, onSendMessage, classNam
         </div>
 
         {conversation.messages.map((msg) => {
-          const isMine = msg.senderId === 0;
+          const isMine = msg.senderId === currentUserId;
           const showSenderName = conversation.type === 'group' && !isMine;
           
           return (
@@ -123,7 +119,7 @@ export default function ChatPane({ conversation, onBack, onSendMessage, classNam
                 </div>
               )}
               <div 
-                className={`max-w-[85%] md:max-w-[65%] rounded-[20px] px-3.5 py-2 ${
+                className={`max-w-[85%] md:max-w-[65%] rounded-2xl px-3 py-1.5 ${
                   isMine 
                     ? 'bg-[#2C6BED] text-white rounded-br-sm' 
                     : 'bg-[#F2F2F2] text-gray-900 rounded-bl-sm'
@@ -136,12 +132,12 @@ export default function ChatPane({ conversation, onBack, onSendMessage, classNam
                 )}
                 <p className="text-[15px] leading-[1.4] break-words whitespace-pre-wrap">{msg.content}</p>
                 <div className={`flex items-center justify-end gap-1 mt-0.5 text-[11px] font-medium ${isMine ? 'text-blue-100' : 'text-gray-500'}`}>
-                  <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+                  <span>{new Date(ensureUTC(msg.timestamp)).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
                   {isMine && (
                     <span className="flex-shrink-0 ml-0.5">
                       {msg.status === 'read' && <CheckCheck size={14} className="text-white" />}
-                      {msg.status === 'delivered' && <CheckCheck size={14} className="text-blue-100" />}
-                      {msg.status === 'sent' && <Check size={14} className="text-blue-100" />}
+                      {msg.status === 'delivered' && <CheckCheck size={14} className="text-blue-200" />}
+                      {msg.status === 'sent' && <Check size={14} className="text-blue-200" />}
                       {msg.status === 'sending' && <span className="opacity-70 text-[10px]">...</span>}
                     </span>
                   )}

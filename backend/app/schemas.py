@@ -60,9 +60,20 @@ class ConversationMemberResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class GroupResponse(BaseModel):
+    id: int
+    name: str
+    avatar_url: Optional[str] = None
+    created_by: int
+    
+    class Config:
+        from_attributes = True
+
 class ConversationResponse(BaseModel):
     id: int
     type: str
+    group_id: Optional[int] = None
+    group: Optional[GroupResponse] = None
     created_at: datetime
     updated_at: datetime
     members: List[ConversationMemberResponse]
@@ -74,6 +85,8 @@ class ConversationResponse(BaseModel):
 class ConversationListResponse(BaseModel):
     id: int
     type: str
+    group_id: Optional[int] = None
+    group: Optional[GroupResponse] = None
     created_at: datetime
     updated_at: datetime
     members: List[ConversationMemberResponse]
@@ -85,3 +98,10 @@ class ConversationListResponse(BaseModel):
 
 class DirectConversationCreate(BaseModel):
     contact_user_id: int
+
+class GroupConversationCreate(BaseModel):
+    name: str
+    member_ids: List[int]
+
+class GroupMemberAdd(BaseModel):
+    user_id: int

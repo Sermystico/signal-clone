@@ -48,6 +48,8 @@ class ConversationMember(Base):
     conversation_id = Column(Integer, ForeignKey("conversations.id"), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
     joined_at = Column(DateTime, default=datetime.utcnow)
+    last_read_message_id = Column(Integer, default=0)
+    last_delivered_message_id = Column(Integer, default=0)
 
     conversation = relationship("Conversation", back_populates="members")
     user = relationship("User")

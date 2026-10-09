@@ -18,6 +18,11 @@ app.add_middleware(
 )
 
 from .routers import auth, users, contacts, conversations, messages, ws
+import os
+from fastapi.staticfiles import StaticFiles
+
+os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 app.include_router(auth.router)
 app.include_router(users.router)

@@ -21,11 +21,15 @@ def get_conversations(db: Session = Depends(get_db), current_user: models.User =
         # Get last message
         last_message = db.query(models.Message).filter(models.Message.conversation_id == conv.id).order_by(desc(models.Message.created_at)).first()
         
-        # Calculate unread count (messages not sent by current_user and status != 'read')
+        # Get member info for current_user
+        member = next((m for m in conv.members if m.user_id == current_user.id), None)
+        last_read_id = member.last_read_message_id if member else 0
+        
+        # Calculate unread count (messages not sent by current_user and id > last_read_id)
         unread_count = db.query(models.Message).filter(
             models.Message.conversation_id == conv.id,
             models.Message.sender_id != current_user.id,
-            models.Message.status != 'read'
+            models.Message.id > last_read_id
         ).count()
         
         conv_dict = {
@@ -74,6 +78,52 @@ def create_direct_conversation(payload: schemas.DirectConversationCreate, db: Se
     
     return conv
 
+@router.post("/group", response_model=schemas.ConversationResponse)
+def create_group_conversation(payload: schemas.GroupConversationCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if not payload.name:
+        raise HTTPException(status_code=400, detail="Group name is required")
+    
+    # Ensure current_user is in member_ids
+    member_ids = set(payload.member_ids)
+    member_ids.add(current_user.id)
+    
+    if len(member_ids) < 2:
+        raise HTTPException(status_code=400, detail="Group must have at least 2 members")
+        
+    # Verify all users exist
+    users = db.query(models.User).filter(models.User.id.in_(member_ids)).all()
+    if len(users) != len(member_ids):
+        raise HTTPException(status_code=400, detail="One or more users do not exist")
+        
+    # Create Group
+    group = models.Group(name=payload.name, created_by=current_user.id)
+    db.add(group)
+    db.commit()
+    db.refresh(group)
+    
+    # Create Group Members
+    group_members = []
+    for uid in member_ids:
+        role = 'admin' if uid == current_user.id else 'member'
+        group_members.append(models.GroupMember(group_id=group.id, user_id=uid, role=role))
+    db.add_all(group_members)
+    
+    # Create Conversation
+    conv = models.Conversation(type="group", group_id=group.id)
+    db.add(conv)
+    db.commit()
+    db.refresh(conv)
+    
+    # Create Conversation Members
+    conv_members = []
+    for uid in member_ids:
+        conv_members.append(models.ConversationMember(conversation_id=conv.id, user_id=uid))
+    db.add_all(conv_members)
+    db.commit()
+    db.refresh(conv)
+    
+    return conv
+
 @router.get("/{conversation_id}", response_model=schemas.ConversationResponse)
 def get_conversation(conversation_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     conv = db.query(models.Conversation).filter(models.Conversation.id == conversation_id).first()
@@ -94,3 +144,87 @@ def get_conversation(conversation_id: int, db: Session = Depends(get_db), curren
     db.commit()
     
     return conv
+
+@router.post("/{conversation_id}/members", response_model=schemas.ConversationResponse)
+def add_group_member(conversation_id: int, payload: schemas.GroupMemberAdd, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    conv = db.query(models.Conversation).filter(models.Conversation.id == conversation_id, models.Conversation.type == 'group').first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Group conversation not found")
+        
+    group = db.query(models.Group).filter(models.Group.id == conv.group_id).first()
+    current_member = db.query(models.GroupMember).filter(models.GroupMember.group_id == group.id, models.GroupMember.user_id == current_user.id).first()
+    
+    if not current_member or current_member.role != 'admin':
+        raise HTTPException(status_code=403, detail="Only administrators can add members")
+        
+    # Check if user to add exists
+    user_to_add = db.query(models.User).filter(models.User.id == payload.user_id).first()
+    if not user_to_add:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    existing_member = db.query(models.GroupMember).filter(models.GroupMember.group_id == group.id, models.GroupMember.user_id == payload.user_id).first()
+    if existing_member:
+        raise HTTPException(status_code=400, detail="User is already a member")
+        
+    db.add(models.GroupMember(group_id=group.id, user_id=payload.user_id, role='member'))
+    db.add(models.ConversationMember(conversation_id=conv.id, user_id=payload.user_id))
+    db.commit()
+    db.refresh(conv)
+    return conv
+
+@router.delete("/{conversation_id}/members/{user_id}", response_model=schemas.ConversationResponse)
+def remove_group_member(conversation_id: int, user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    conv = db.query(models.Conversation).filter(models.Conversation.id == conversation_id, models.Conversation.type == 'group').first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Group conversation not found")
+        
+    group = db.query(models.Group).filter(models.Group.id == conv.group_id).first()
+    current_member = db.query(models.GroupMember).filter(models.GroupMember.group_id == group.id, models.GroupMember.user_id == current_user.id).first()
+    
+    if not current_member or current_member.role != 'admin':
+        raise HTTPException(status_code=403, detail="Only administrators can remove members")
+        
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot remove yourself. Use leave endpoint.")
+        
+    member_to_remove = db.query(models.GroupMember).filter(models.GroupMember.group_id == group.id, models.GroupMember.user_id == user_id).first()
+    if not member_to_remove:
+        raise HTTPException(status_code=404, detail="Member not found")
+        
+    db.delete(member_to_remove)
+    conv_member = db.query(models.ConversationMember).filter(models.ConversationMember.conversation_id == conv.id, models.ConversationMember.user_id == user_id).first()
+    if conv_member:
+        db.delete(conv_member)
+    db.commit()
+    db.refresh(conv)
+    return conv
+
+@router.delete("/{conversation_id}/leave", status_code=204)
+def leave_group(conversation_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    conv = db.query(models.Conversation).filter(models.Conversation.id == conversation_id, models.Conversation.type == 'group').first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Group conversation not found")
+        
+    group = db.query(models.Group).filter(models.Group.id == conv.group_id).first()
+    current_member = db.query(models.GroupMember).filter(models.GroupMember.group_id == group.id, models.GroupMember.user_id == current_user.id).first()
+    
+    if not current_member:
+        raise HTTPException(status_code=400, detail="Not a member of this group")
+        
+    is_admin = current_member.role == 'admin'
+    
+    db.delete(current_member)
+    conv_member = db.query(models.ConversationMember).filter(models.ConversationMember.conversation_id == conv.id, models.ConversationMember.user_id == current_user.id).first()
+    if conv_member:
+        db.delete(conv_member)
+        
+    # Administrator departure policy:
+    # If the departing member is an admin, assign admin role to the oldest remaining member.
+    if is_admin:
+        remaining_members = db.query(models.GroupMember).filter(models.GroupMember.group_id == group.id).order_by(models.GroupMember.joined_at).all()
+        if remaining_members:
+            new_admin = remaining_members[0]
+            new_admin.role = 'admin'
+            
+    db.commit()
+    return

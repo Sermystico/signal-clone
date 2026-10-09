@@ -28,11 +28,70 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...), db: 
         await websocket.close(code=1008)
         return
         
+    # Mark user as online if this is their first connection
+    was_offline = user.id not in manager.active_connections
     await manager.connect(websocket, user.id)
     
-    # Mark user as online
-    user.is_online = True
-    db.commit()
+    if was_offline:
+        user.is_online = True
+        
+        # Mark messages sent to this user as delivered
+        memberships = db.query(models.ConversationMember).filter(models.ConversationMember.user_id == user.id).all()
+        for member in memberships:
+            # Find messages in this conversation sent by others that have id > last_delivered
+            undelivered = db.query(models.Message).filter(
+                models.Message.conversation_id == member.conversation_id,
+                models.Message.sender_id != user.id,
+                models.Message.id > (member.last_delivered_message_id or 0)
+            ).all()
+            
+            senders_to_notify = set()
+            max_id = 0
+            for msg in undelivered:
+                senders_to_notify.add((msg.sender_id, msg.id))
+                if msg.id > max_id:
+                    max_id = msg.id
+                    
+            if max_id > 0:
+                member.last_delivered_message_id = max_id
+                # Update status to delivered if it is still sent
+                for msg in undelivered:
+                    if msg.status == 'sent':
+                        msg.status = 'delivered'
+                        
+                for sender_id, msg_id in senders_to_notify:
+                    # Don't await in loop, just let it run or create tasks
+                    # We will do it synchronously here since it's just a few messages usually
+                    pass
+        
+        db.commit()
+        
+        # Since we can't easily await inside the DB loop without complicating things, 
+        # let's just broadcast the status events after commit
+        for member in memberships:
+            undelivered = db.query(models.Message).filter(
+                models.Message.conversation_id == member.conversation_id,
+                models.Message.sender_id != user.id,
+                models.Message.status == 'delivered'
+            ).all()
+            for msg in undelivered:
+                await manager.send_personal_message({
+                    "type": "message.status",
+                    "payload": {
+                        "message_id": msg.id,
+                        "conversation_id": msg.conversation_id,
+                        "status": "delivered"
+                    }
+                }, msg.sender_id)
+
+        await manager.broadcast({
+            "type": "presence.update",
+            "payload": {
+                "user_id": user.id,
+                "is_online": True,
+                "last_seen": datetime.utcnow().isoformat()
+            }
+        })
     
     try:
         while True:
@@ -54,20 +113,33 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...), db: 
                         ).first()
                         
                         if membership:
+                            # Check if any other member is online
+                            conv = db.query(models.Conversation).filter(models.Conversation.id == conv_id).first()
+                            is_delivered = False
+                            for m in conv.members:
+                                if m.user_id != user.id and m.user.is_online:
+                                    is_delivered = True
+                                    m.last_delivered_message_id = 999999999 # We will fix this after we get the msg.id
+                                    
                             msg = models.Message(
                                 conversation_id=conv_id,
                                 sender_id=user.id,
                                 content=content,
-                                status="sent"
+                                status="delivered" if is_delivered else "sent"
                             )
                             db.add(msg)
                             
-                            conv = db.query(models.Conversation).filter(models.Conversation.id == conv_id).first()
                             conv.updated_at = datetime.utcnow()
-                            
                             db.commit()
                             db.refresh(msg)
                             db.refresh(conv)
+                            
+                            # Fix last_delivered_message_id now that we have msg.id
+                            if is_delivered:
+                                for m in conv.members:
+                                    if m.user_id != user.id and m.user.is_online:
+                                        m.last_delivered_message_id = msg.id
+                                db.commit()
                             
                             # Broadcast
                             for member in conv.members:
@@ -121,26 +193,51 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...), db: 
                     conv_id = payload.get("conversation_id")
                     if message_id and conv_id:
                         msg = db.query(models.Message).filter(models.Message.id == message_id).first()
-                        if msg and msg.sender_id != user.id:
-                            msg.status = "read"
-                            msg.read_at = datetime.utcnow()
-                            db.commit()
+                        if msg:
+                            # Update last_read_message_id for this user
+                            membership = db.query(models.ConversationMember).filter(
+                                models.ConversationMember.conversation_id == conv_id,
+                                models.ConversationMember.user_id == user.id
+                            ).first()
                             
-                            # Notify sender
-                            await manager.send_personal_message({
-                                "type": "message.status",
-                                "payload": {
-                                    "message_id": message_id,
-                                    "conversation_id": conv_id,
-                                    "status": "read"
-                                }
-                            }, msg.sender_id)
+                            was_updated = False
+                            if membership and message_id > membership.last_read_message_id:
+                                membership.last_read_message_id = message_id
+                                was_updated = True
+                                db.commit()
+                                
+                            # Only notify sender and update msg status if it wasn't already processed
+                            if was_updated and msg.sender_id != user.id:
+                                # For direct messages, we can globally set to read
+                                conv = db.query(models.Conversation).filter(models.Conversation.id == conv_id).first()
+                                if conv and len(conv.members) == 2:
+                                    msg.status = "read"
+                                    msg.read_at = datetime.utcnow()
+                                    db.commit()
+
+                                await manager.send_personal_message({
+                                    "type": "message.status",
+                                    "payload": {
+                                        "message_id": message_id,
+                                        "conversation_id": conv_id,
+                                        "status": "read"
+                                    }
+                                }, msg.sender_id)
 
             except json.JSONDecodeError:
                 pass
                 
     except WebSocketDisconnect:
         manager.disconnect(websocket, user.id)
-        user.is_online = False
-        user.last_seen = datetime.utcnow()
-        db.commit()
+        if user.id not in manager.active_connections:
+            user.is_online = False
+            user.last_seen = datetime.utcnow()
+            db.commit()
+            await manager.broadcast({
+                "type": "presence.update",
+                "payload": {
+                    "user_id": user.id,
+                    "is_online": False,
+                    "last_seen": user.last_seen.isoformat()
+                }
+            })

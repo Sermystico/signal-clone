@@ -17,4 +17,5 @@ export interface MockConversation {
   unreadCount: number;
   messages: MockMessage[];
   isOnline?: boolean;
+  otherUserId?: number;
 }
