@@ -14,9 +14,9 @@ def seed_db():
         return
 
     # Seed Demo Users
-    user1 = models.User(username="alice", phone="+1234567890", display_name="Alice", avatar_url="https://i.pravatar.cc/150?u=alice")
-    user2 = models.User(username="bob", phone="+1987654321", display_name="Bob", avatar_url="https://i.pravatar.cc/150?u=bob")
-    user3 = models.User(username="charlie", phone="+1122334455", display_name="Charlie", avatar_url="https://i.pravatar.cc/150?u=charlie")
+    user1 = models.User(username="alice", phone="+919876500001", display_name="Alice", avatar_url="https://i.pravatar.cc/150?u=alice")
+    user2 = models.User(username="bob", phone="+919876500002", display_name="Bob", avatar_url="https://i.pravatar.cc/150?u=bob")
+    user3 = models.User(username="charlie", phone="+919876500003", display_name="Charlie", avatar_url="https://i.pravatar.cc/150?u=charlie")
     
     db.add_all([user1, user2, user3])
     db.commit()

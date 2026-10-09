@@ -35,6 +35,8 @@ def get_conversations(db: Session = Depends(get_db), current_user: models.User =
         conv_dict = {
             "id": conv.id,
             "type": conv.type,
+            "group_id": conv.group_id,
+            "group": conv.group,
             "created_at": conv.created_at,
             "updated_at": conv.updated_at,
             "members": conv.members,
@@ -51,13 +53,13 @@ def create_direct_conversation(payload: schemas.DirectConversationCreate, db: Se
         raise HTTPException(status_code=400, detail="Cannot create conversation with yourself")
         
     # Check if a direct conversation already exists between these two users
-    my_direct_conv_ids = db.query(models.ConversationMember.conversation_id).join(models.Conversation).filter(
+    my_direct_conv_ids_query = db.query(models.ConversationMember.conversation_id).join(models.Conversation).filter(
         models.ConversationMember.user_id == current_user.id,
         models.Conversation.type == 'direct'
-    ).subquery()
+    )
     
     existing_conv = db.query(models.Conversation).join(models.ConversationMember).filter(
-        models.Conversation.id.in_(my_direct_conv_ids),
+        models.Conversation.id.in_(my_direct_conv_ids_query),
         models.ConversationMember.user_id == payload.contact_user_id
     ).first()
     
@@ -191,6 +193,14 @@ def remove_group_member(conversation_id: int, user_id: int, db: Session = Depend
     if not member_to_remove:
         raise HTTPException(status_code=404, detail="Member not found")
         
+    if member_to_remove.role == 'admin':
+        admin_count = db.query(models.GroupMember).filter(
+            models.GroupMember.group_id == group.id,
+            models.GroupMember.role == 'admin'
+        ).count()
+        if admin_count <= 1:
+            raise HTTPException(status_code=400, detail="Cannot remove the last remaining administrator")
+        
     db.delete(member_to_remove)
     conv_member = db.query(models.ConversationMember).filter(models.ConversationMember.conversation_id == conv.id, models.ConversationMember.user_id == user_id).first()
     if conv_member:
@@ -217,14 +227,24 @@ def leave_group(conversation_id: int, db: Session = Depends(get_db), current_use
     conv_member = db.query(models.ConversationMember).filter(models.ConversationMember.conversation_id == conv.id, models.ConversationMember.user_id == current_user.id).first()
     if conv_member:
         db.delete(conv_member)
+    db.flush()
         
     # Administrator departure policy:
-    # If the departing member is an admin, assign admin role to the oldest remaining member.
+    # If the departing member is an admin and no other admins remain, assign admin role to the oldest remaining member.
     if is_admin:
-        remaining_members = db.query(models.GroupMember).filter(models.GroupMember.group_id == group.id).order_by(models.GroupMember.joined_at).all()
-        if remaining_members:
-            new_admin = remaining_members[0]
-            new_admin.role = 'admin'
+        remaining_admin = db.query(models.GroupMember).filter(
+            models.GroupMember.group_id == group.id,
+            models.GroupMember.user_id != current_user.id,
+            models.GroupMember.role == 'admin'
+        ).first()
+        
+        if not remaining_admin:
+            oldest_member = db.query(models.GroupMember).filter(
+                models.GroupMember.group_id == group.id,
+                models.GroupMember.user_id != current_user.id
+            ).order_by(models.GroupMember.joined_at.asc()).first()
+            if oldest_member:
+                oldest_member.role = 'admin'
             
     db.commit()
     return

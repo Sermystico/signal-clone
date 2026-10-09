@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import Sidebar from "@/components/sidebar/Sidebar";
 import ChatPane from "@/components/chat/ChatPane";
 import ProfileModal from "@/components/profile/ProfileModal";
 import NewChatModal from "@/components/chat/NewChatModal";
-import Avatar from "@/components/ui/Avatar";
+import GroupDetailsModal from "@/components/chat/GroupDetailsModal";
 import { MockConversation, MockMessage, MessageStatus } from "@/types";
 import { Menu, MessageCircle, Phone, Layers, Settings } from "lucide-react";
 
@@ -29,6 +29,18 @@ interface APIConversation {
     id: number;
     name: string;
     avatar_url: string | null;
+    created_by: number;
+    members?: {
+      user_id: number;
+      role: string;
+      user: {
+        id: number;
+        username: string;
+        display_name: string;
+        phone?: string | null;
+        avatar_url: string | null;
+      };
+    }[];
   };
   members?: {
     user_id: number;
@@ -36,6 +48,7 @@ interface APIConversation {
       display_name: string;
       avatar_url: string | null;
       is_online: boolean;
+      last_seen: string;
     };
   }[];
 }
@@ -54,6 +67,7 @@ const mapConversation = (conv: APIConversation, currentUserId: number): MockConv
   const name = convType === 'group' && conv.group ? conv.group.name : (otherMember ? otherMember.user.display_name : 'Chat');
   const avatar = convType === 'group' && conv.group ? conv.group.avatar_url : (otherMember ? otherMember.user.avatar_url : null);
   const isOnline = convType === 'direct' ? (otherMember ? otherMember.user.is_online : false) : false;
+  const lastSeen = convType === 'direct' ? (otherMember ? otherMember.user.last_seen : undefined) : undefined;
   const otherUserId = convType === 'direct' ? (otherMember ? otherMember.user_id : undefined) : undefined;
   
   return {
@@ -65,7 +79,9 @@ const mapConversation = (conv: APIConversation, currentUserId: number): MockConv
     unreadCount: conv.unread_count || 0,
     messages: conv.last_message ? [mapMessage(conv.last_message)] : [],
     isOnline,
+    lastSeen,
     otherUserId,
+    group: conv.group,
   };
 };
 
@@ -80,8 +96,11 @@ export default function Home() {
     activeIdRef.current = activeId;
   }, [activeId]);
 
+  const [contactUserIds, setContactUserIds] = useState<Set<number>>(new Set());
+  const [sidebarView, setSidebarView] = useState<'chats' | 'new_chat' | 'new_group'>('chats');
   const [showProfile, setShowProfile] = useState(false);
   const [showNewChat, setShowNewChat] = useState(false);
+  const [showGroupDetails, setShowGroupDetails] = useState(false);
   const [showTabs, setShowTabs] = useState(true);
   const [activeTab, setActiveTab] = useState('chats');
   const [localAvatarUrl, setLocalAvatarUrl] = useState<string | null | undefined>(undefined);
@@ -89,6 +108,32 @@ export default function Home() {
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+  // Fetch contacts
+  const fetchContacts = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/contacts/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const ids = new Set<number>(data.map((c: any) => c.contact_user.id));
+        setContactUserIds(ids);
+      }
+    } catch (err) {
+      console.error("Failed to load contacts", err);
+    }
+  }, [token, API_URL]);
+
+  useEffect(() => {
+    if (token) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      fetchContacts();
+    }
+  }, [token, fetchContacts]);
+
+  // Fetch conversations and maintain WS connection
   useEffect(() => {
     if (!user || !token) return;
 
@@ -119,7 +164,7 @@ export default function Home() {
       ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
         if (data.type === 'message.new') {
-          const payload = data.payload || data.data; // support both just in case
+          const payload = data.payload || data.data;
           const newMsg = mapMessage(payload);
           const convId = payload.conversation_id;
           
@@ -135,19 +180,20 @@ export default function Home() {
                 const isViewing = conv.id === activeIdRef.current;
                 
                 if (isViewing && newMsg.senderId !== user.id) {
-                    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                        wsRef.current.send(JSON.stringify({ 
-                            type: 'message.read', 
-                            payload: { message_id: newMsg.id, conversation_id: convId }
-                        }));
-                    }
+                  if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                    wsRef.current.send(JSON.stringify({ 
+                      type: 'message.read', 
+                      payload: { message_id: newMsg.id, conversation_id: convId }
+                    }));
+                  }
                 }
 
                 return {
                   ...conv,
                   messages: hasMsg ? conv.messages : [...conv.messages, newMsg],
                   lastActivity: newMsg.timestamp,
-                  unreadCount: isViewing ? 0 : conv.unreadCount + (newMsg.senderId !== user.id ? 1 : 0)
+                  unreadCount: isViewing ? 0 : conv.unreadCount + (newMsg.senderId !== user.id ? 1 : 0),
+                  isTyping: false
                 };
               }
               return conv;
@@ -167,10 +213,26 @@ export default function Home() {
             return conv;
           }));
         } else if (data.type === 'presence.update') {
-          const { user_id, is_online } = data.payload;
+          const { user_id, is_online, last_seen } = data.payload;
           setConversations(prev => prev.map(conv => {
             if (conv.otherUserId === user_id) {
-              return { ...conv, isOnline: is_online };
+              return { ...conv, isOnline: is_online, lastSeen: last_seen };
+            }
+            return conv;
+          }));
+        } else if (data.type === 'typing.started') {
+          const { conversation_id } = data.payload;
+          setConversations(prev => prev.map(conv => {
+            if (conv.id === conversation_id) {
+              return { ...conv, isTyping: true };
+            }
+            return conv;
+          }));
+        } else if (data.type === 'typing.stopped') {
+          const { conversation_id } = data.payload;
+          setConversations(prev => prev.map(conv => {
+            if (conv.id === conversation_id) {
+              return { ...conv, isTyping: false };
             }
             return conv;
           }));
@@ -193,6 +255,7 @@ export default function Home() {
     };
   }, [user, token, API_URL]);
 
+  // Fetch messages for active conversation
   useEffect(() => {
     if (!activeId || !user || !token) return;
 
@@ -215,15 +278,10 @@ export default function Home() {
     fetchMessages();
   }, [activeId, user, token, API_URL]);
 
+  // Start Direct Chat (does NOT automatically add as contact)
   const handleStartChat = async (userId: number) => {
     if (!token || !user) return;
     try {
-      // 1. Add contact
-      await fetch(`${API_URL}/contacts/${userId}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      // 2. Create/Get Direct Conversation
       const res = await fetch(`${API_URL}/conversations/direct`, {
         method: 'POST',
         headers: {
@@ -236,7 +294,6 @@ export default function Home() {
       if (res.ok) {
         const conv: APIConversation = await res.json();
         
-        // Re-fetch conversations to update the list, wait for it
         const listRes = await fetch(`${API_URL}/conversations/`, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -250,6 +307,39 @@ export default function Home() {
       }
     } catch (err) {
       console.error("Failed to start chat", err);
+    }
+  };
+
+  // Add/Remove Contact explicitly
+  const handleToggleContact = async (targetUserId: number, isCurrentlyContact: boolean) => {
+    if (!token) return;
+    try {
+      if (isCurrentlyContact) {
+        const res = await fetch(`${API_URL}/contacts/${targetUserId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          setContactUserIds(prev => {
+            const next = new Set(prev);
+            next.delete(targetUserId);
+            return next;
+          });
+          fetchContacts();
+        }
+      } else {
+        const res = await fetch(`${API_URL}/contacts/${targetUserId}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          setContactUserIds(prev => new Set(prev).add(targetUserId));
+          fetchContacts();
+        }
+      }
+    } catch (err) {
+      console.error("Failed to toggle contact", err);
+      throw err;
     }
   };
 
@@ -301,6 +391,15 @@ export default function Home() {
     }
   };
 
+  const handleSendTyping = (conversationId: number | string, isTyping: boolean) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: isTyping ? 'typing.start' : 'typing.stop',
+        payload: { conversation_id: conversationId }
+      }));
+    }
+  };
+
   const handleGroupCreated = async (convId: number) => {
     try {
       const listRes = await fetch(`${API_URL}/conversations/`, {
@@ -312,8 +411,23 @@ export default function Home() {
       }
       setActiveId(convId);
       setShowNewChat(false);
+      setSidebarView('chats');
     } catch (err) {
       console.error("Failed to load group conversation", err);
+    }
+  };
+
+  const refreshConversations = async () => {
+    try {
+      const listRes = await fetch(`${API_URL}/conversations/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (listRes.ok && user) {
+        const listData = await listRes.json();
+        setConversations(listData.map((c: APIConversation) => mapConversation(c, user.id)));
+      }
+    } catch (err) {
+      console.error("Failed to refresh conversations", err);
     }
   };
 
@@ -330,6 +444,9 @@ export default function Home() {
   const activeAvatarUrl = localAvatarUrl !== undefined ? localAvatarUrl : user.avatar_url;
   const userWithAvatar = { ...user, avatar_url: activeAvatarUrl };
   const activeConversation = conversations.find(c => c.id === activeId) || null;
+  const isCurrentActiveContact = activeConversation?.otherUserId
+    ? contactUserIds.has(activeConversation.otherUserId)
+    : false;
 
   return (
     <div className="h-screen w-full flex bg-white overflow-hidden text-gray-900 font-sans">
@@ -347,7 +464,10 @@ export default function Home() {
               <Menu size={20} />
             </button>
             <button 
-              onClick={() => setActiveTab('chats')}
+              onClick={() => {
+                setActiveTab('chats');
+                setSidebarView('chats');
+              }}
               title="Chats"
               aria-label="Chats"
               className={`p-2 rounded-lg transition-colors ${activeTab === 'chats' ? 'bg-gray-200 text-gray-900' : 'hover:bg-gray-200 text-gray-600'}`}
@@ -384,7 +504,8 @@ export default function Home() {
         </div>
       )}
 
-      <div className={`${activeId ? 'hidden md:block' : 'block'} w-full md:w-[300px] lg:w-[340px] flex-shrink-0 h-full z-20 shadow-sm md:shadow-none`}>
+      {/* Left Sidebar (Conversations / Group Creation Workflow) */}
+      <div className={`${activeId ? 'hidden md:block' : 'block'} w-full md:w-[320px] lg:w-[360px] flex-shrink-0 h-full z-20 shadow-sm md:shadow-none`}>
         <Sidebar 
           user={userWithAvatar}
           activeTab={activeTab}
@@ -392,19 +513,32 @@ export default function Home() {
           activeConversationId={activeId}
           onSelectConversation={(id) => setActiveId(id)}
           onOpenProfile={() => setShowProfile(true)}
-          onNewChat={() => setShowNewChat(true)}
+          onNewChat={() => setSidebarView('new_chat')}
+          onOpenNewGroup={() => setSidebarView('new_group')}
+          sidebarView={sidebarView}
+          onSetSidebarView={setSidebarView}
+          onGroupCreated={handleGroupCreated}
+          onStartChat={handleStartChat}
           showTabsButton={!showTabs}
           onToggleTabs={() => setShowTabs(true)}
         />
       </div>
+
+      {/* Center Chat Pane */}
       <div className={`${!activeId ? 'hidden md:flex' : 'flex'} flex-1 h-full min-w-0`}>
         <ChatPane 
           currentUserId={user.id}
           conversation={activeConversation}
           onBack={() => setActiveId(null)}
           onSendMessage={handleSendMessage}
+          onSendTyping={handleSendTyping}
+          onViewDetails={() => setShowGroupDetails(true)}
+          isContact={isCurrentActiveContact}
+          onToggleContact={handleToggleContact}
         />
       </div>
+
+      {/* Profile Settings Modal */}
       {showProfile && (
         <ProfileModal 
           user={userWithAvatar} 
@@ -418,12 +552,28 @@ export default function Home() {
           }}
         />
       )}
+
+      {/* New Chat Modal (Find contacts / users) */}
       {showNewChat && (
         <NewChatModal 
           token={token as string}
           onClose={() => setShowNewChat(false)}
           onStartChat={handleStartChat}
-          onGroupCreated={handleGroupCreated}
+          onOpenNewGroup={() => {
+            setShowNewChat(false);
+            setSidebarView('new_group');
+          }}
+        />
+      )}
+
+      {/* Group Details & Member Management Modal */}
+      {showGroupDetails && activeConversation?.type === 'group' && (
+        <GroupDetailsModal
+          conversation={activeConversation}
+          currentUserId={user.id}
+          token={token as string}
+          onClose={() => setShowGroupDetails(false)}
+          onUpdate={refreshConversations}
         />
       )}
     </div>

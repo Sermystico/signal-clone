@@ -17,5 +17,24 @@ export interface MockConversation {
   unreadCount: number;
   messages: MockMessage[];
   isOnline?: boolean;
+  lastSeen?: string;
   otherUserId?: number;
+  isTyping?: boolean;
+  group?: {
+    id: number;
+    name: string;
+    avatar_url: string | null;
+    created_by: number;
+    members?: {
+      user_id: number;
+      role: string;
+      user: {
+        id: number;
+        username: string;
+        display_name: string;
+        phone?: string | null;
+        avatar_url: string | null;
+      };
+    }[];
+  };
 }

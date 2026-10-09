@@ -33,3 +33,16 @@ def add_contact(contact_user_id: int, db: Session = Depends(get_db), current_use
     db.commit()
     db.refresh(contact)
     return contact
+
+@router.delete("/{contact_user_id}")
+def remove_contact(contact_user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    contact = db.query(models.Contact).filter(
+        models.Contact.user_id == current_user.id,
+        models.Contact.contact_user_id == contact_user_id
+    ).first()
+    if not contact:
+        return {"detail": "Contact not found"}
+    db.delete(contact)
+    db.commit()
+    return {"detail": "Contact removed"}
+

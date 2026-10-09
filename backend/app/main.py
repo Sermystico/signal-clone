@@ -8,10 +8,14 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Signal Clone API")
 
+import os
+allowed_origins_str = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000")
+allowed_origins = [origin.strip() for origin in allowed_origins_str.split(",")]
+
 # Allow CORS for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"], # For local development frontend
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -30,6 +34,8 @@ app.include_router(contacts.router)
 app.include_router(conversations.router)
 app.include_router(messages.router)
 app.include_router(ws.router)
+from .routers import search
+app.include_router(search.router)
 
 @app.get("/health")
 def health_check():

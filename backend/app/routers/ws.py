@@ -158,34 +158,44 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...), db: 
                 elif event_type == "typing.start":
                     payload = event.get("payload", {})
                     conv_id = payload.get("conversation_id")
-                    if conv_id:
-                        conv = db.query(models.Conversation).filter(models.Conversation.id == conv_id).first()
-                        if conv:
-                            for member in conv.members:
-                                if member.user_id != user.id:
-                                    await manager.send_personal_message({
-                                        "type": "typing.started",
-                                        "payload": {
-                                            "conversation_id": conv_id,
-                                            "user_id": user.id
-                                        }
-                                    }, member.user_id)
+                    if conv_id is not None:
+                        try:
+                            conv_id_int = int(conv_id)
+                        except (ValueError, TypeError):
+                            conv_id_int = None
+                        if conv_id_int is not None:
+                            conv = db.query(models.Conversation).filter(models.Conversation.id == conv_id_int).first()
+                            if conv:
+                                for member in conv.members:
+                                    if member.user_id != user.id:
+                                        await manager.send_personal_message({
+                                            "type": "typing.started",
+                                            "payload": {
+                                                "conversation_id": conv_id_int,
+                                                "user_id": user.id
+                                            }
+                                        }, member.user_id)
                                     
                 elif event_type == "typing.stop":
                     payload = event.get("payload", {})
                     conv_id = payload.get("conversation_id")
-                    if conv_id:
-                        conv = db.query(models.Conversation).filter(models.Conversation.id == conv_id).first()
-                        if conv:
-                            for member in conv.members:
-                                if member.user_id != user.id:
-                                    await manager.send_personal_message({
-                                        "type": "typing.stopped",
-                                        "payload": {
-                                            "conversation_id": conv_id,
-                                            "user_id": user.id
-                                        }
-                                    }, member.user_id)
+                    if conv_id is not None:
+                        try:
+                            conv_id_int = int(conv_id)
+                        except (ValueError, TypeError):
+                            conv_id_int = None
+                        if conv_id_int is not None:
+                            conv = db.query(models.Conversation).filter(models.Conversation.id == conv_id_int).first()
+                            if conv:
+                                for member in conv.members:
+                                    if member.user_id != user.id:
+                                        await manager.send_personal_message({
+                                            "type": "typing.stopped",
+                                            "payload": {
+                                                "conversation_id": conv_id_int,
+                                                "user_id": user.id
+                                            }
+                                        }, member.user_id)
                                     
                 elif event_type == "message.read":
                     payload = event.get("payload", {})

@@ -32,9 +32,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
   const fetchUser = useCallback(async (authToken: string) => {
     try {
-      const res = await fetch('http://localhost:8000/auth/me', {
+      const res = await fetch(`${API_URL}/auth/me`, {
         headers: {
           Authorization: `Bearer ${authToken}`
         }

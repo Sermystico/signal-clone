@@ -8,12 +8,36 @@ class UserBase(BaseModel):
     display_name: str
     avatar_url: Optional[str] = None
 
-class UserCreate(UserBase):
+class UserCreate(BaseModel):
+    phone: str
+    username: str
+    display_name: str
     otp: str
+    avatar_url: Optional[str] = None
 
 class UserLogin(BaseModel):
-    username: str
+    username: Optional[str] = None
+    identifier: Optional[str] = None
     otp: str
+
+class UserLoginPhone(BaseModel):
+    phone: str
+    otp: str
+
+class CheckPhoneRequest(BaseModel):
+    phone: str
+
+class CheckPhoneResponse(BaseModel):
+    exists: bool
+    phone: str
+
+class VerifyOtpRequest(BaseModel):
+    phone: Optional[str] = None
+    identifier: Optional[str] = None
+    otp: str
+
+class VerifyOtpResponse(BaseModel):
+    valid: bool
 
 class UserResponse(UserBase):
     id: int
@@ -60,11 +84,21 @@ class ConversationMemberResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class GroupMemberResponse(BaseModel):
+    user_id: int
+    role: str
+    joined_at: datetime
+    user: UserResponse
+    
+    class Config:
+        from_attributes = True
+
 class GroupResponse(BaseModel):
     id: int
     name: str
     avatar_url: Optional[str] = None
     created_by: int
+    members: List[GroupMemberResponse] = []
     
     class Config:
         from_attributes = True
