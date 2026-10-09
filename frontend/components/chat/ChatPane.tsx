@@ -72,13 +72,11 @@ export default function ChatPane({
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isTypingSentRef = useRef(false);
 
-  // Compute common groups for direct contact or current group name
+  // Compute common groups for direct contact only
   const commonGroupNames = React.useMemo(() => {
-    if (!conversation) return [];
-    if (conversation.type === 'group') {
-      return [conversation.name];
+    if (!conversation || conversation.type === 'group' || !conversation.otherUserId || !allConversations.length) {
+      return [];
     }
-    if (!conversation.otherUserId || !allConversations.length) return [];
     return allConversations
       .filter(
         (c) =>
@@ -315,125 +313,146 @@ export default function ChatPane({
 
       {/* Messages View */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-white">
-        {/* Signal Intro Block (Matches Photo 1) */}
-        <div className="flex flex-col items-center justify-center mt-10 mb-6">
-          <div className="bg-white border border-gray-300/80 rounded-[28px] px-8 py-5 pt-8 relative flex flex-col items-center max-w-[270px] w-full shadow-2xs text-center">
-            {/* Avatar overlapping top border */}
-            <div className="absolute -top-7 left-1/2 -translate-x-1/2">
-              <Avatar
-                url={conversation.avatar}
-                name={conversation.name}
-                size={54}
-                className="border-3 border-white shadow-xs"
-              />
+        {/* Intro Block: Simple clean info for group, or Interactive Contact Card with Arrow for Direct Chat */}
+        {conversation.type === 'group' ? (
+          <div className="flex flex-col items-center justify-center mt-8 mb-4">
+            <Avatar
+              url={conversation.avatar}
+              name={conversation.name}
+              size={56}
+              className="mb-2 shadow-xs"
+            />
+            <h3 className="text-[17px] font-bold text-gray-900">{conversation.name}</h3>
+            <p className="text-[13px] text-gray-500 mt-0.5">
+              {conversation.group?.members?.length || 0} members
+            </p>
+            <div className="text-[12px] font-medium text-gray-400 mt-4">
+              Yesterday
             </div>
-
-            {/* Name + Chevron Right (Click opens Photo 2 Popover) */}
-            <button
-              type="button"
-              onClick={() => setShowContactPopup(true)}
-              className="flex items-center justify-center gap-1 text-[17px] font-bold text-gray-900 hover:text-blue-600 transition-colors cursor-pointer group mt-0.5"
-            >
-              <span>{conversation.name}</span>
-              <ChevronRight size={17} className="text-gray-500 group-hover:text-blue-600 transition-colors stroke-[2.5]" />
-            </button>
-
-            {/* Subtitle: Member of <group names> / empty if none */}
-            {commonGroupNames.length > 0 && (
-              <div className="flex items-center justify-center gap-1.5 text-[13px] text-gray-800 font-medium mt-1.5">
-                <Users size={14} className="text-gray-600 flex-shrink-0" />
-                <span>
-                  Member of <strong>{commonGroupNames.join(', ')}</strong>
-                </span>
-              </div>
-            )}
           </div>
-
-          {/* Date separator underneath card */}
-          <div className="text-[12px] font-medium text-gray-400 mt-5">
-            Yesterday
-          </div>
-        </div>
-
-        {/* Contact Details Popover (Matches Photo 2) */}
-        {showContactPopup && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-2xs px-4 animate-in fade-in duration-150"
-            onClick={() => setShowContactPopup(false)}
-          >
-            <div
-              className="bg-white rounded-[28px] p-6 max-w-[320px] w-full shadow-2xl relative border border-gray-100 flex flex-col items-center animate-in zoom-in-95 duration-150"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Close Button */}
-              <button
-                type="button"
-                onClick={() => setShowContactPopup(false)}
-                className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-gray-100 text-gray-500 transition-colors cursor-pointer"
-                aria-label="Close"
-              >
-                <X size={18} />
-              </button>
-
-              {/* Big Center Avatar */}
-              <div className="mt-2 mb-5">
-                <Avatar
-                  url={conversation.avatar}
-                  name={conversation.name}
-                  size={136}
-                  className="shadow-xs border-2 border-white"
-                />
-              </div>
-
-              {/* Info Card List */}
-              <div className="w-full bg-white border border-gray-200/90 rounded-2xl p-2 space-y-0.5 shadow-2xs">
-                {/* Row 1: Name */}
-                <div className="flex items-center gap-3 px-3 py-2 text-[14px] font-medium text-gray-900">
-                  <User size={16} className="text-gray-600 flex-shrink-0" />
-                  <span className="truncate">{conversation.name}</span>
+        ) : (
+          <>
+            {/* Direct Contact Intro Card (Matches Photo 1) */}
+            <div className="flex flex-col items-center justify-center mt-10 mb-6">
+              <div className="bg-white border border-gray-300/80 rounded-[28px] px-8 py-5 pt-8 relative flex flex-col items-center max-w-[270px] w-full shadow-2xs text-center">
+                {/* Avatar overlapping top border */}
+                <div className="absolute -top-7 left-1/2 -translate-x-1/2">
+                  <Avatar
+                    url={conversation.avatar}
+                    name={conversation.name}
+                    size={54}
+                    className="border-3 border-white shadow-xs"
+                  />
                 </div>
 
-                {/* Row 2: Signal Connection */}
-                <div className="flex items-center justify-between px-3 py-2 text-[14px] font-medium text-gray-900 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors">
-                  <div className="flex items-center gap-3">
-                    <Sparkles size={16} className="text-gray-600 flex-shrink-0" />
-                    <span>Signal Connection</span>
-                  </div>
-                  <ChevronRight size={14} className="text-gray-400" />
-                </div>
-
-                {/* Row 3: System contacts */}
-                <div
-                  onClick={handleContactAction}
-                  className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-gray-900 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors"
+                {/* Name + Chevron Right (Click opens Photo 2 Popover) */}
+                <button
+                  type="button"
+                  onClick={() => setShowContactPopup(true)}
+                  className="flex items-center justify-center gap-1 text-[17px] font-bold text-gray-900 hover:text-blue-600 transition-colors cursor-pointer group mt-0.5"
                 >
-                  <UserCheck size={16} className="text-gray-600 flex-shrink-0" />
-                  <span className="truncate flex-1">
-                    {isContact
-                      ? `${conversation.name} is in your system contacts`
-                      : `Add ${conversation.name} to contacts`}
-                  </span>
-                  {contactLoading && <Loader2 size={13} className="animate-spin text-gray-500" />}
-                </div>
+                  <span>{conversation.name}</span>
+                  <ChevronRight size={17} className="text-gray-500 group-hover:text-blue-600 transition-colors stroke-[2.5]" />
+                </button>
 
-                {/* Row 4: Phone Number */}
-                <div className="flex items-center gap-3 px-3 py-2 text-[14px] font-medium text-gray-900">
-                  <Phone size={16} className="text-gray-600 flex-shrink-0" />
-                  <span className="truncate">{conversation.phone || '099299 61431'}</span>
-                </div>
-
-                {/* Row 5: Member of <group names> / empty if none */}
+                {/* Subtitle: Member of <group names> / empty if none */}
                 {commonGroupNames.length > 0 && (
-                  <div className="flex items-center gap-3 px-3 py-2 text-[14px] font-medium text-gray-900">
-                    <Users size={16} className="text-gray-600 flex-shrink-0" />
-                    <span className="truncate">
+                  <div className="flex items-center justify-center gap-1.5 text-[13px] text-gray-800 font-medium mt-1.5">
+                    <Users size={14} className="text-gray-600 flex-shrink-0" />
+                    <span>
                       Member of <strong>{commonGroupNames.join(', ')}</strong>
                     </span>
                   </div>
                 )}
               </div>
+
+              {/* Date separator underneath card */}
+              <div className="text-[12px] font-medium text-gray-400 mt-5">
+                Yesterday
+              </div>
             </div>
-          </div>
+
+            {/* Direct Contact Details Popover (Matches Photo 2) */}
+            {showContactPopup && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-2xs px-4 animate-in fade-in duration-150"
+                onClick={() => setShowContactPopup(false)}
+              >
+                <div
+                  className="bg-white rounded-[28px] p-6 max-w-[320px] w-full shadow-2xl relative border border-gray-100 flex flex-col items-center animate-in zoom-in-95 duration-150"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Close Button */}
+                  <button
+                    type="button"
+                    onClick={() => setShowContactPopup(false)}
+                    className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-gray-100 text-gray-500 transition-colors cursor-pointer"
+                    aria-label="Close"
+                  >
+                    <X size={18} />
+                  </button>
+
+                  {/* Big Center Avatar */}
+                  <div className="mt-2 mb-5">
+                    <Avatar
+                      url={conversation.avatar}
+                      name={conversation.name}
+                      size={136}
+                      className="shadow-xs border-2 border-white"
+                    />
+                  </div>
+
+                  {/* Info Card List */}
+                  <div className="w-full bg-white border border-gray-200/90 rounded-2xl p-2 space-y-0.5 shadow-2xs">
+                    {/* Row 1: Name */}
+                    <div className="flex items-center gap-3 px-3 py-2 text-[14px] font-medium text-gray-900">
+                      <User size={16} className="text-gray-600 flex-shrink-0" />
+                      <span className="truncate">{conversation.name}</span>
+                    </div>
+
+                    {/* Row 2: Signal Connection */}
+                    <div className="flex items-center justify-between px-3 py-2 text-[14px] font-medium text-gray-900 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors">
+                      <div className="flex items-center gap-3">
+                        <Sparkles size={16} className="text-gray-600 flex-shrink-0" />
+                        <span>Signal Connection</span>
+                      </div>
+                      <ChevronRight size={14} className="text-gray-400" />
+                    </div>
+
+                    {/* Row 3: System contacts */}
+                    <div
+                      onClick={handleContactAction}
+                      className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-gray-900 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors"
+                    >
+                      <UserCheck size={16} className="text-gray-600 flex-shrink-0" />
+                      <span className="truncate flex-1">
+                        {isContact
+                          ? `${conversation.name} is in your system contacts`
+                          : `Add ${conversation.name} to contacts`}
+                      </span>
+                      {contactLoading && <Loader2 size={13} className="animate-spin text-gray-500" />}
+                    </div>
+
+                    {/* Row 4: Phone Number */}
+                    <div className="flex items-center gap-3 px-3 py-2 text-[14px] font-medium text-gray-900">
+                      <Phone size={16} className="text-gray-600 flex-shrink-0" />
+                      <span className="truncate">{conversation.phone || '099299 61431'}</span>
+                    </div>
+
+                    {/* Row 5: Member of <group names> / empty if none */}
+                    {commonGroupNames.length > 0 && (
+                      <div className="flex items-center gap-3 px-3 py-2 text-[14px] font-medium text-gray-900">
+                        <Users size={16} className="text-gray-600 flex-shrink-0" />
+                        <span className="truncate">
+                          Member of <strong>{commonGroupNames.join(', ')}</strong>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         <div className="flex justify-center my-4">

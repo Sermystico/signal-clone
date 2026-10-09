@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setToken(null);
         setUser(null);
         if (pathname !== '/login' && pathname !== '/register') {
-          router.push('/login');
+          router.replace('/login');
         }
       }
     } catch (err) {
@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else {
       setLoading(false);
       if (pathname !== '/login' && pathname !== '/register') {
-        router.push('/login');
+        router.replace('/login');
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -76,7 +76,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loading && !user && pathname !== '/login' && pathname !== '/register') {
-      router.push('/login');
+      router.replace('/login');
+    }
+  }, [user, loading, pathname, router]);
+
+  useEffect(() => {
+    if (!loading && user && (pathname === '/login' || pathname === '/register')) {
+      router.replace('/');
     }
   }, [user, loading, pathname, router]);
 
@@ -85,7 +91,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(newToken);
     setLoading(true);
     fetchUser(newToken).then(() => {
-      window.location.href = '/';
+      if (typeof window !== 'undefined') {
+        window.location.replace('/');
+      } else {
+        router.replace('/');
+      }
     });
   };
 
@@ -93,7 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('token');
     setToken(null);
     setUser(null);
-    router.push('/login');
+    router.replace('/login');
   };
 
   return (

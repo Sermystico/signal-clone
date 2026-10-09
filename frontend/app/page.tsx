@@ -114,6 +114,33 @@ export default function Home() {
   const [localAvatarUrl, setLocalAvatarUrl] = useState<string | null | undefined>(undefined);
   const wsRef = useRef<WebSocket | null>(null);
 
+  // Sync conversation selection with browser history state
+  const handleSelectConversation = useCallback((id: number | string | null) => {
+    setActiveId(id);
+    if (id !== null && typeof window !== 'undefined') {
+      window.history.pushState({ chatOpen: true, conversationId: id }, '', window.location.pathname);
+    }
+  }, []);
+
+  const handleBackFromChat = useCallback(() => {
+    setActiveId(null);
+    if (typeof window !== 'undefined' && window.history.state?.chatOpen) {
+      window.history.back();
+    }
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      // When user presses browser back button, close active conversation if one was open
+      if (activeIdRef.current !== null) {
+        setActiveId(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   // Auto-hide nav toast
   useEffect(() => {
     if (navToast) {
@@ -318,7 +345,7 @@ export default function Home() {
           setConversations(data.map((c: APIConversation) => mapConversation(c, user.id)));
         }
         
-        setActiveId(conv.id);
+        handleSelectConversation(conv.id);
         setShowNewChat(false);
       }
     } catch (err) {
@@ -425,7 +452,7 @@ export default function Home() {
         const listData = await listRes.json();
         setConversations(listData.map((c: APIConversation) => mapConversation(c, user.id)));
       }
-      setActiveId(convId);
+      handleSelectConversation(convId);
       setShowNewChat(false);
       setSidebarView('chats');
     } catch (err) {
@@ -527,7 +554,7 @@ export default function Home() {
           activeTab={activeTab}
           conversations={conversations}
           activeConversationId={activeId}
-          onSelectConversation={(id) => setActiveId(id)}
+          onSelectConversation={handleSelectConversation}
           onOpenProfile={() => setShowProfile(true)}
           onNewChat={() => setSidebarView('new_chat')}
           onOpenNewGroup={() => setSidebarView('new_group')}
@@ -546,7 +573,7 @@ export default function Home() {
           currentUserId={user.id}
           conversation={activeConversation}
           allConversations={conversations}
-          onBack={() => setActiveId(null)}
+          onBack={handleBackFromChat}
           onSendMessage={handleSendMessage}
           onSendTyping={handleSendTyping}
           onViewDetails={() => setShowGroupDetails(true)}
