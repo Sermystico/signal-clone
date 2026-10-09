@@ -3,19 +3,25 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import models
 from .database import engine
 
-# Create the database tables
+# Create the database tables and auto-seed if empty
 models.Base.metadata.create_all(bind=engine)
+try:
+    from .seed import seed_db
+    seed_db()
+except Exception as e:
+    print(f"Auto-seed note: {e}")
 
 app = FastAPI(title="Signal Clone API")
 
 import os
-allowed_origins_str = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000")
-allowed_origins = [origin.strip() for origin in allowed_origins_str.split(",")]
+allowed_origins_str = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000,*")
+allowed_origins = [origin.strip() for origin in allowed_origins_str.split(",") if origin.strip()]
 
-# Allow CORS for frontend
+# Allow CORS for frontend with regex fallback for preview domains
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=allowed_origins if "*" not in allowed_origins else [],
+    allow_origin_regex=r".*" if "*" in allowed_origins else None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
