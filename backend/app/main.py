@@ -13,15 +13,10 @@ except Exception as e:
 
 app = FastAPI(title="Signal Clone API")
 
-import os
-allowed_origins_str = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000,*")
-allowed_origins = [origin.strip() for origin in allowed_origins_str.split(",") if origin.strip()]
-
-# Allow CORS for frontend with regex fallback for preview domains
+# Allow CORS for all frontend origins (Vercel production, preview branches, and localhost)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins if "*" not in allowed_origins else [],
-    allow_origin_regex=r".*" if "*" in allowed_origins else None,
+    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
