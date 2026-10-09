@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+import os
+import uuid
+import shutil
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from sqlalchemy.orm import Session
 from typing import List
 from ..database import get_db
@@ -8,6 +11,33 @@ from datetime import datetime
 from ..websockets import manager
 
 router = APIRouter(prefix="/messages", tags=["messages"])
+
+@router.post("/upload")
+async def upload_attachment(
+    file: UploadFile = File(...),
+    request: Request = None,
+    current_user: models.User = Depends(get_current_user)
+):
+    os.makedirs("uploads", exist_ok=True)
+    safe_name = os.path.basename(file.filename).replace(" ", "_")
+    unique_id = uuid.uuid4().hex[:10]
+    filename = f"{unique_id}_{safe_name}"
+    filepath = os.path.join("uploads", filename)
+    
+    with open(filepath, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    base_url = str(request.base_url) if request else "http://localhost:8000/"
+    if not base_url.endswith("/"):
+        base_url += "/"
+    file_url = f"{base_url}uploads/{filename}"
+    
+    return {
+        "url": file_url,
+        "filename": file.filename,
+        "size": os.path.getsize(filepath),
+        "content_type": file.content_type or "application/octet-stream"
+    }
 
 @router.get("/{conversation_id}", response_model=List[schemas.MessageResponse])
 async def get_messages(conversation_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):

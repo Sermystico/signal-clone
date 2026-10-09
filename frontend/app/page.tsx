@@ -573,6 +573,7 @@ export default function Home() {
           currentUserId={user.id}
           conversation={activeConversation}
           allConversations={conversations}
+          token={token as string}
           onBack={handleBackFromChat}
           onSendMessage={handleSendMessage}
           onSendTyping={handleSendTyping}
