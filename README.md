@@ -1,6 +1,20 @@
 # Signal Clone — Real-Time Secure Messaging Application
 
-A full-stack, real-time messaging web application built with pixel-level fidelity to mirror the UI, UX, and core workflows of **Signal Desktop**.
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat&logo=next.js)](https://nextjs.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=flat&logo=fastapi)](https://fastapi.tiangolo.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-4.0-38B2AC?style=flat&logo=tailwind-css)](https://tailwindcss.com/)
+[![WebSockets](https://img.shields.io/badge/WebSockets-Real--Time-orange?style=flat&logo=socketdotio)](https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API)
+[![SQLite](https://img.shields.io/badge/SQLite-ACID-003B57?style=flat&logo=sqlite)](https://www.sqlite.org/)
+
+A full-stack, real-time messaging web application engineered with pixel-level fidelity to mirror the UI, UX, and security workflows of **Signal Desktop**.
+
+---
+
+## 🌐 Live Deployments
+
+- **Frontend Application:** [https://signal-clone-frontend-omega.vercel.app](https://signal-clone-frontend-omega.vercel.app)
+- **Backend API & Swagger Docs:** [https://signal-clone-backend.onrender.com/docs](https://signal-clone-backend.onrender.com/docs)
 
 ---
 
@@ -11,14 +25,14 @@ A full-stack, real-time messaging web application built with pixel-level fidelit
 - **Language:** TypeScript
 - **Styling:** Vanilla CSS & Tailwind CSS (Custom HSL palette, Glassmorphism, Signal Dark/Light themes, Responsive layouts)
 - **Icons:** Lucide React & Custom Signal SVGs (Stories segmented icon)
-- **Avatars:** LoremFaces Dynamic Human Avatar API
+- **Avatars:** Dynamic LoremFaces Avatar Generator
 
 ### Backend
 - **Framework:** FastAPI (Python 3.12+)
 - **ORM & Database:** SQLAlchemy & SQLite (ACID compliant)
 - **Real-Time Protocol:** WebSockets (Bi-directional async connection manager with presence, typing, and read receipts)
 - **Authentication:** JWT (JSON Web Tokens) with Phone/Username + Mock OTP (`123456`)
-- **Static File Storage:** FastAPI StaticFiles mount for user avatars and message file attachments
+- **Static Storage:** FastAPI StaticFiles mount (`/uploads`) for user avatars and message media attachments
 
 ---
 
@@ -29,7 +43,7 @@ A full-stack, real-time messaging web application built with pixel-level fidelit
 - **Delivery & Read Receipts:** Single check (`sent`), double check (`delivered`), and white double check (`read`).
 - **Live Typing Indicators:** Real-time animated typing bubbles that automatically stop when idle.
 - **Presence Tracking:** Online/Offline green status indicators and human-readable "Last seen" timestamps.
-- **Browser History Integration:** Integrated `popstate` navigation where the Back button closes active conversations smoothly without leaving the app.
+- **Browser History Integration:** Fluid `popstate` navigation where the browser Back button closes open conversations without navigating to the login page.
 
 ### 📎 Media & File Attachments
 - **Multi-Format Support:** Photos, videos, audio clips, PDFs, documents (`.doc`, `.docx`, `.xls`, `.xlsx`, `.ppt`), text files, and archives (`.zip`).
@@ -225,6 +239,12 @@ npm run dev
 ```
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+### 3. Running Automated Tests
+```bash
+cd backend
+python verify_all.py
+```
+
 ---
 
 ## 🧪 Demo Test Credentials
@@ -256,5 +276,14 @@ The database is pre-seeded with sample users, contacts, and active conversations
 5. Under **Advanced**, add a **Persistent Disk** mounted at `/data` (to preserve SQLite database and file uploads).
 6. Add environment variables:
    - `DATABASE_URL`: `sqlite:////data/sql_app.db`
-   - `ALLOWED_ORIGINS`: Your Vercel frontend URL (e.g., `https://signal-clone-frontend.vercel.app`).
+   - `ALLOWED_ORIGINS`: Your Vercel frontend URL (e.g., `https://signal-clone-frontend-omega.vercel.app`).
 7. Deploy.
+
+---
+
+## 📌 Key Assumptions & Notes
+
+1. **Mock OTP Authentication:** Real SMS gateway delivery is mocked with fixed development code `123456` as permitted.
+2. **One-Way Contacts:** Adding User B to User A's contacts is one-way. Removing a contact leaves conversation history intact.
+3. **Admin Succession:** When a group admin leaves, administrative privileges automatically transfer to the oldest remaining member.
+4. **End-to-End Encryption:** E2EE status notices and security lock badges are UI-simulated per the specification.
