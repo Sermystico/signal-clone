@@ -225,20 +225,6 @@ npm run dev
 ```
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
----
-
-## 🧪 Demo Test Credentials
-
-The database is pre-seeded with sample users, contacts, and active conversations:
-
-| Username | Phone Number | Display Name | Mock OTP |
-|---|---|---|---|
-| `alice` | `+919876500001` | Alice | `123456` |
-| `bob` | `+919876500002` | Bob | `123456` |
-| `charlie` | `+919876500003` | Charlie | `123456` |
-| `test` | `+919876500004` | test | `123456` |
-| `test2` | `+919876500005` | test2 | `123456` |
-| `test3` | `+919876500006` | test3 | `123456` |
 
 ---
 
