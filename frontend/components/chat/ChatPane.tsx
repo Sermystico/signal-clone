@@ -374,46 +374,17 @@ export default function ChatPane({
               </div>
             </div>
 
-            {/* Contact Status Notice Banner (Add / Remove contact toggle) */}
-            <div className="flex justify-center my-3 px-4">
-              {!isContact ? (
-                <div className="flex items-center justify-between gap-3 bg-blue-50/90 border border-blue-200/80 rounded-2xl px-4 py-2.5 max-w-[420px] w-full shadow-2xs">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <UserPlus size={17} className="text-blue-600 flex-shrink-0" />
-                    <span className="text-[13px] text-gray-700 font-medium leading-tight">
-                      This person is not in your contact list
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={contactLoading}
-                    onClick={handleContactAction}
-                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-[12.5px] font-semibold rounded-xl shadow-2xs transition-colors flex-shrink-0 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  >
-                    {contactLoading && <Loader2 size={12} className="animate-spin" />}
-                    <span>Add to contacts</span>
-                  </button>
+            {/* Contact Status Notice (Text-only notice in main chat; disappears when added to contacts) */}
+            {!isContact && (
+              <div className="flex justify-center my-2.5 px-4">
+                <div className="flex items-center gap-2 bg-gray-100/90 text-gray-600 border border-gray-200/80 rounded-full px-4 py-1.5 shadow-2xs">
+                  <UserPlus size={14} className="text-gray-500 flex-shrink-0" />
+                  <span className="text-[12.5px] font-medium leading-tight">
+                    This person is not in your contact list
+                  </span>
                 </div>
-              ) : (
-                <div className="flex items-center justify-between gap-3 bg-gray-50/90 border border-gray-200/80 rounded-2xl px-4 py-2 max-w-[420px] w-full shadow-2xs">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <UserCheck size={16} className="text-emerald-600 flex-shrink-0" />
-                    <span className="text-[12.5px] text-gray-600 font-medium leading-tight">
-                      In your contacts
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={contactLoading}
-                    onClick={handleContactAction}
-                    className="px-2.5 py-1 bg-white hover:bg-red-50 text-gray-600 hover:text-red-600 border border-gray-200 hover:border-red-200 text-[12px] font-medium rounded-xl transition-colors flex-shrink-0 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  >
-                    {contactLoading && <Loader2 size={12} className="animate-spin" />}
-                    <span>Remove</span>
-                  </button>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Direct Contact Details Popover (Matches Photo 2) */}
             {showContactPopup && (
