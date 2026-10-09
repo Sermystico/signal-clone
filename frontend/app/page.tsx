@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import Sidebar from "@/components/sidebar/Sidebar";
 import ChatPane from "@/components/chat/ChatPane";
 import ProfileModal from "@/components/profile/ProfileModal";
+import NewChatModal from "@/components/chat/NewChatModal";
 import Avatar from "@/components/ui/Avatar";
 import { MockConversation, MockMessage, MessageStatus } from "@/types";
 
@@ -71,6 +72,7 @@ export default function Home() {
   }, [activeId]);
 
   const [showProfile, setShowProfile] = useState(false);
+  const [showNewChat, setShowNewChat] = useState(false);
   const [localAvatarUrl, setLocalAvatarUrl] = useState<string | null | undefined>(undefined);
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -154,6 +156,44 @@ export default function Home() {
     fetchMessages();
   }, [activeId, user, token, API_URL]);
 
+  const handleStartChat = async (userId: number) => {
+    if (!token || !user) return;
+    try {
+      // 1. Add contact
+      await fetch(`${API_URL}/contacts/${userId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      // 2. Create/Get Direct Conversation
+      const res = await fetch(`${API_URL}/conversations/direct`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ contact_user_id: userId })
+      });
+      
+      if (res.ok) {
+        const conv: APIConversation = await res.json();
+        
+        // Re-fetch conversations to update the list, wait for it
+        const listRes = await fetch(`${API_URL}/conversations/`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (listRes.ok) {
+          const data = await listRes.json();
+          setConversations(data.map((c: APIConversation) => mapConversation(c, user.id)));
+        }
+        
+        setActiveId(conv.id);
+        setShowNewChat(false);
+      }
+    } catch (err) {
+      console.error("Failed to start chat", err);
+    }
+  };
+
   const handleSendMessage = async (conversationId: number | string, content: string) => {
     if (!token || !user) return;
     
@@ -220,7 +260,7 @@ export default function Home() {
     <div className="h-screen w-full flex bg-white overflow-hidden text-gray-900 font-sans">
       <div className="hidden md:flex flex-col w-[64px] bg-[#F3F3F3] border-r border-gray-200 h-full py-3 items-center justify-between z-30 flex-shrink-0">
         <div className="flex flex-col gap-3 items-center w-full">
-          <button onClick={() => setShowProfile(true)} className="focus:outline-none mb-2 mt-1 hover:opacity-80 transition-opacity">
+          <button tabIndex={-1} className="focus:outline-none mb-2 mt-1 hover:opacity-80 transition-opacity">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-700"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
           </button>
           <div className="p-2.5 bg-white rounded-xl cursor-pointer shadow-sm text-gray-900">
@@ -234,10 +274,10 @@ export default function Home() {
           </div>
         </div>
         <div className="flex flex-col gap-3 items-center w-full">
-          <button onClick={() => setShowProfile(true)} className="focus:outline-none mb-1">
+          <button tabIndex={-1} onClick={() => setShowProfile(true)} className="focus:outline-none mb-1">
             <Avatar url={activeAvatarUrl} name={userWithAvatar.display_name || "User"} size={32} />
           </button>
-          <div className="p-2.5 hover:bg-gray-200 rounded-xl cursor-pointer text-gray-700 transition-colors" onClick={() => setShowProfile(true)}>
+          <div className="p-2.5 hover:bg-gray-200 rounded-xl cursor-pointer text-gray-700 transition-colors">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
           </div>
         </div>
@@ -249,6 +289,7 @@ export default function Home() {
           activeConversationId={activeId}
           onSelectConversation={(id) => setActiveId(id)}
           onOpenProfile={() => setShowProfile(true)}
+          onNewChat={() => setShowNewChat(true)}
         />
       </div>
       <div className={`${!activeId ? 'hidden md:flex' : 'flex'} flex-1 h-full min-w-0`}>
@@ -264,6 +305,13 @@ export default function Home() {
           onClose={() => setShowProfile(false)} 
           onLogout={logout} 
           onUpdateAvatar={(url) => setLocalAvatarUrl(url)}
+        />
+      )}
+      {showNewChat && (
+        <NewChatModal 
+          token={token as string}
+          onClose={() => setShowNewChat(false)}
+          onStartChat={handleStartChat}
         />
       )}
     </div>

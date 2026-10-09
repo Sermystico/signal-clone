@@ -10,6 +10,7 @@ interface SidebarProps {
   activeConversationId: number | string | null;
   onSelectConversation: (id: number | string) => void;
   onOpenProfile: () => void;
+  onNewChat: () => void;
   className?: string;
 }
 
@@ -19,6 +20,7 @@ export default function Sidebar({
   activeConversationId, 
   onSelectConversation,
   onOpenProfile,
+  onNewChat,
   className = ""
 }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -38,7 +40,7 @@ export default function Sidebar({
           <h1 className="text-xl font-bold text-gray-900">Chats</h1>
         </div>
         <div className="flex gap-1 text-gray-600">
-          <button className="p-2 hover:bg-gray-100 rounded-full transition-colors" title="New Chat">
+          <button onClick={onNewChat} className="p-2 hover:bg-gray-100 rounded-full transition-colors" title="New Chat">
             <Edit size={20} />
           </button>
           <button className="p-2 hover:bg-gray-100 rounded-full transition-colors" title="More options">
