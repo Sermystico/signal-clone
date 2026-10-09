@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, Search, Users, AtSign, Hash, Loader2 } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
 
@@ -30,6 +30,7 @@ export default function NewChatSidebar({
   const [searchResults, setSearchResults] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -123,6 +124,7 @@ export default function NewChatSidebar({
         <div className="relative">
           <Search size={16} className="absolute left-3 top-2.5 text-gray-400" />
           <input
+            ref={inputRef}
             type="text"
             placeholder="Name, username, or number"
             value={query}
@@ -150,7 +152,10 @@ export default function NewChatSidebar({
 
             {/* Action Row: Find by username */}
             <button
-              onClick={() => setQuery('@')}
+              onClick={() => {
+                setQuery('@');
+                inputRef.current?.focus();
+              }}
               className="w-full flex items-center gap-3.5 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors text-left"
             >
               <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-700 flex-shrink-0">
@@ -161,7 +166,10 @@ export default function NewChatSidebar({
 
             {/* Action Row: Find by phone number */}
             <button
-              onClick={() => setQuery('+')}
+              onClick={() => {
+                setQuery('+');
+                inputRef.current?.focus();
+              }}
               className="w-full flex items-center gap-3.5 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors text-left"
             >
               <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-700 flex-shrink-0">

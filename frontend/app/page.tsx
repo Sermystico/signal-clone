@@ -8,7 +8,8 @@ import ProfileModal from "@/components/profile/ProfileModal";
 import NewChatModal from "@/components/chat/NewChatModal";
 import GroupDetailsModal from "@/components/chat/GroupDetailsModal";
 import { MockConversation, MockMessage, MessageStatus } from "@/types";
-import { Menu, MessageCircle, Phone, Layers, Settings } from "lucide-react";
+import { Menu, MessageCircle, Phone, Settings } from "lucide-react";
+import StoriesIcon from "@/components/icons/StoriesIcon";
 
 interface APIMessage {
   id: number;
@@ -45,7 +46,9 @@ interface APIConversation {
   members?: {
     user_id: number;
     user: {
+      username?: string;
       display_name: string;
+      phone?: string | null;
       avatar_url: string | null;
       is_online: boolean;
       last_seen: string;
@@ -69,6 +72,8 @@ const mapConversation = (conv: APIConversation, currentUserId: number): MockConv
   const isOnline = convType === 'direct' ? (otherMember ? otherMember.user.is_online : false) : false;
   const lastSeen = convType === 'direct' ? (otherMember ? otherMember.user.last_seen : undefined) : undefined;
   const otherUserId = convType === 'direct' ? (otherMember ? otherMember.user_id : undefined) : undefined;
+  const phone = convType === 'direct' ? otherMember?.user.phone : undefined;
+  const username = convType === 'direct' ? otherMember?.user.username : undefined;
   
   return {
     id: conv.id,
@@ -81,6 +86,8 @@ const mapConversation = (conv: APIConversation, currentUserId: number): MockConv
     isOnline,
     lastSeen,
     otherUserId,
+    phone,
+    username,
     group: conv.group,
   };
 };
@@ -103,8 +110,17 @@ export default function Home() {
   const [showGroupDetails, setShowGroupDetails] = useState(false);
   const [showTabs, setShowTabs] = useState(true);
   const [activeTab, setActiveTab] = useState('chats');
+  const [navToast, setNavToast] = useState<string | null>(null);
   const [localAvatarUrl, setLocalAvatarUrl] = useState<string | null | undefined>(undefined);
   const wsRef = useRef<WebSocket | null>(null);
+
+  // Auto-hide nav toast
+  useEffect(() => {
+    if (navToast) {
+      const t = setTimeout(() => setNavToast(null), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [navToast]);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -475,20 +491,20 @@ export default function Home() {
               <MessageCircle size={20} />
             </button>
             <button 
-              onClick={() => setActiveTab('calls')}
-              title="Calls"
+              onClick={() => setNavToast('Calls - Coming Soon')}
+              title="Calls (Coming Soon)"
               aria-label="Calls"
-              className={`p-2 rounded-lg transition-colors ${activeTab === 'calls' ? 'bg-gray-200 text-gray-900' : 'hover:bg-gray-200 text-gray-600'}`}
+              className="p-2 rounded-lg transition-colors hover:bg-gray-200 text-gray-600 cursor-pointer"
             >
               <Phone size={20} />
             </button>
             <button 
-              onClick={() => setActiveTab('stories')}
-              title="Stories"
+              onClick={() => setNavToast('Stories - Coming Soon')}
+              title="Stories (Coming Soon)"
               aria-label="Stories"
-              className={`p-2 rounded-lg transition-colors ${activeTab === 'stories' ? 'bg-gray-200 text-gray-900' : 'hover:bg-gray-200 text-gray-600'}`}
+              className="p-2 rounded-lg transition-colors hover:bg-gray-200 text-gray-600 cursor-pointer"
             >
-              <Layers size={20} />
+              <StoriesIcon size={20} />
             </button>
           </div>
           <div className="flex flex-col gap-4 items-center w-full">
@@ -529,6 +545,7 @@ export default function Home() {
         <ChatPane 
           currentUserId={user.id}
           conversation={activeConversation}
+          allConversations={conversations}
           onBack={() => setActiveId(null)}
           onSendMessage={handleSendMessage}
           onSendTyping={handleSendTyping}
@@ -575,6 +592,13 @@ export default function Home() {
           onClose={() => setShowGroupDetails(false)}
           onUpdate={refreshConversations}
         />
+      )}
+
+      {/* Navigation Toast Notification */}
+      {navToast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900/90 text-white text-[13px] font-medium px-4 py-2 rounded-full shadow-lg backdrop-blur-xs flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-200 pointer-events-none">
+          <span>{navToast}</span>
+        </div>
       )}
     </div>
   );

@@ -19,6 +19,8 @@ export interface MockConversation {
   isOnline?: boolean;
   lastSeen?: string;
   otherUserId?: number;
+  phone?: string | null;
+  username?: string | null;
   isTyping?: boolean;
   group?: {
     id: number;

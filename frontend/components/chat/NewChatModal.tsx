@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, Search, Users, AtSign, Hash } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
 
@@ -23,6 +23,7 @@ export default function NewChatModal({ token, onClose, onStartChat, onOpenNewGro
   const [contacts, setContacts] = useState<UserResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -101,6 +102,7 @@ export default function NewChatModal({ token, onClose, onStartChat, onOpenNewGro
           <div className="relative">
             <Search size={18} className="absolute left-3 top-2.5 text-gray-400" />
             <input 
+              ref={inputRef}
               type="text" 
               placeholder="Name, username, or number" 
               value={query}
@@ -133,6 +135,7 @@ export default function NewChatModal({ token, onClose, onStartChat, onOpenNewGro
               <button 
                 onClick={() => {
                   setQuery("@");
+                  inputRef.current?.focus();
                 }}
                 className="w-full flex items-center gap-4 px-4 py-3 hover:bg-gray-50 rounded-xl transition-colors text-left"
               >
@@ -144,6 +147,7 @@ export default function NewChatModal({ token, onClose, onStartChat, onOpenNewGro
               <button 
                 onClick={() => {
                   setQuery("+");
+                  inputRef.current?.focus();
                 }}
                 className="w-full flex items-center gap-4 px-4 py-3 hover:bg-gray-50 rounded-xl transition-colors text-left"
               >

@@ -14,8 +14,10 @@ router = APIRouter(prefix="/users", tags=["users"])
 @router.get("/search", response_model=List[schemas.UserResponse])
 def search_users(q: str = Query("", min_length=0), db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     query = db.query(models.User).filter(models.User.id != current_user.id)
-    if q.strip():
-        search_str = f"%{q.strip()}%"
+    raw_q = q.strip()
+    clean_q = raw_q.lstrip("@").strip()
+    if clean_q:
+        search_str = f"%{clean_q}%"
         query = query.filter(
             (models.User.username.ilike(search_str)) | 
             (models.User.display_name.ilike(search_str)) |

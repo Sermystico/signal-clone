@@ -164,7 +164,8 @@ export default function RegisterPage() {
 
     try {
       const fullPhone = getNormalizedPhone();
-      const defaultAvatar = `https://i.pravatar.cc/150?u=${cleanUsername}`;
+      const faceId = (cleanUsername.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 5) + 1;
+      const defaultAvatar = `https://www.loremfaces.net/128/id/${faceId}.jpg`;
 
       const res = await fetch(`${API_URL}/auth/register`, {
         method: "POST",
@@ -365,7 +366,7 @@ export default function RegisterPage() {
             <div className="flex flex-col items-center justify-center">
               <div className="relative group mb-2">
                 <Avatar
-                  url={avatarPreview || (username ? `https://i.pravatar.cc/150?u=${username}` : undefined)}
+                  url={avatarPreview || (username ? `https://www.loremfaces.net/128/id/${(username.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 5) + 1}.jpg` : undefined)}
                   name={displayName || username || "New User"}
                   size={84}
                   className="shadow-md border-2 border-gray-100"

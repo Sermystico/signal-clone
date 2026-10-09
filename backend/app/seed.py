@@ -8,15 +8,22 @@ def seed_db():
     
     db = SessionLocal()
     
+    # Ensure/update existing users with modern LoremFaces avatars if needed
+    for u in db.query(models.User).all():
+        if not u.avatar_url or "pravatar" in u.avatar_url or "dicebear" in u.avatar_url or "bottts" in u.avatar_url:
+            face_id = (sum(ord(c) for c in u.username) % 5) + 1
+            u.avatar_url = f"https://www.loremfaces.net/128/id/{face_id}.jpg"
+    db.commit()
+
     if db.query(models.User).first():
         print("Database already seeded.")
         db.close()
         return
 
     # Seed Demo Users
-    user1 = models.User(username="alice", phone="+919876500001", display_name="Alice", avatar_url="https://i.pravatar.cc/150?u=alice")
-    user2 = models.User(username="bob", phone="+919876500002", display_name="Bob", avatar_url="https://i.pravatar.cc/150?u=bob")
-    user3 = models.User(username="charlie", phone="+919876500003", display_name="Charlie", avatar_url="https://i.pravatar.cc/150?u=charlie")
+    user1 = models.User(username="alice", phone="+919876500001", display_name="Alice", avatar_url="https://www.loremfaces.net/128/id/1.jpg")
+    user2 = models.User(username="bob", phone="+919876500002", display_name="Bob", avatar_url="https://www.loremfaces.net/128/id/2.jpg")
+    user3 = models.User(username="charlie", phone="+919876500003", display_name="Charlie", avatar_url="https://www.loremfaces.net/128/id/3.jpg")
     
     db.add_all([user1, user2, user3])
     db.commit()

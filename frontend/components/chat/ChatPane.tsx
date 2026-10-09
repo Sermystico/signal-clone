@@ -8,9 +8,13 @@ import {
   Check,
   CheckCheck,
   Search,
-  UserPlus,
-  UserMinus,
-  Loader2
+  ChevronRight,
+  Users,
+  User,
+  Sparkles,
+  UserCheck,
+  X,
+  Loader2,
 } from 'lucide-react';
 import { MockConversation } from '@/types';
 import Avatar from '@/components/ui/Avatar';
@@ -18,6 +22,7 @@ import Avatar from '@/components/ui/Avatar';
 interface ChatPaneProps {
   currentUserId: number;
   conversation: MockConversation | null;
+  allConversations?: MockConversation[];
   onBack: () => void;
   onSendMessage: (conversationId: number | string, content: string) => void;
   onSendTyping?: (conversationId: number | string, isTyping: boolean) => void;
@@ -50,6 +55,7 @@ const formatLastSeen = (lastSeen?: string) => {
 export default function ChatPane({
   currentUserId,
   conversation,
+  allConversations = [],
   onBack,
   onSendMessage,
   onSendTyping,
@@ -60,10 +66,27 @@ export default function ChatPane({
 }: ChatPaneProps) {
   const [message, setMessage] = useState('');
   const [contactLoading, setContactLoading] = useState(false);
+  const [showContactPopup, setShowContactPopup] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isTypingSentRef = useRef(false);
+
+  // Compute common groups for direct contact or current group name
+  const commonGroupNames = React.useMemo(() => {
+    if (!conversation) return [];
+    if (conversation.type === 'group') {
+      return [conversation.name];
+    }
+    if (!conversation.otherUserId || !allConversations.length) return [];
+    return allConversations
+      .filter(
+        (c) =>
+          c.type === 'group' &&
+          c.group?.members?.some((m) => m.user_id === conversation.otherUserId)
+      )
+      .map((c) => c.group?.name || c.name);
+  }, [conversation, allConversations]);
 
   // Auto-scroll to bottom when messages or typing status change
   useEffect(() => {
@@ -245,52 +268,30 @@ export default function ChatPane({
         </div>
 
         <div className="flex items-center gap-1 text-gray-600 flex-shrink-0">
-          {/* Explicit Add/Remove Contact button in header for direct chat */}
-          {conversation.type === 'direct' && conversation.otherUserId && (
-            <button
-              onClick={handleContactAction}
-              disabled={contactLoading}
-              title={isContact ? 'Remove from Contacts' : 'Add to Contacts'}
-              className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
-                isContact
-                  ? 'text-gray-600 hover:text-red-600 hover:bg-red-50'
-                  : 'text-blue-600 bg-blue-50 hover:bg-blue-100'
-              }`}
-            >
-              {contactLoading ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : isContact ? (
-                <>
-                  <UserMinus size={15} />
-                  <span>Remove Contact</span>
-                </>
-              ) : (
-                <>
-                  <UserPlus size={15} />
-                  <span>Add Contact</span>
-                </>
-              )}
-            </button>
-          )}
-
           <button
-            title="Start a video call"
+            type="button"
+            onClick={() => setToastMessage('Video calls - Coming soon')}
+            title="Video call (Coming soon)"
             aria-label="Start a video call"
-            className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
           >
             <Video size={20} />
           </button>
           <button
-            title="Start a call"
+            type="button"
+            onClick={() => setToastMessage('Voice calls - Coming soon')}
+            title="Voice call (Coming soon)"
             aria-label="Start a call"
-            className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors hidden sm:block focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors hidden sm:block focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
           >
             <Phone size={20} />
           </button>
           <button
+            type="button"
+            onClick={() => setToastMessage('Search within conversation - Coming soon')}
             title="Search"
             aria-label="Search"
-            className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
           >
             <Search size={20} />
           </button>
@@ -298,87 +299,142 @@ export default function ChatPane({
             onClick={onViewDetails}
             title={conversation.type === 'group' ? 'Group Details & Members' : 'More info'}
             aria-label="More info"
-            className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="p-2.5 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
           >
             <MoreHorizontal size={20} />
           </button>
         </div>
       </div>
 
+      {/* Floating Toast Notification */}
+      {toastMessage && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 bg-gray-900/90 text-white text-[13px] font-medium px-4 py-2 rounded-full shadow-lg backdrop-blur-xs flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-200 pointer-events-none">
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       {/* Messages View */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-white">
-        {/* Intro Block */}
-        <div className="flex flex-col items-center justify-center mt-8 mb-6">
-          <div className="bg-white border border-gray-200 rounded-[24px] px-12 py-6 flex flex-col items-center max-w-md w-full shadow-2xs">
-            <div className="mb-2">
-              <Avatar url={conversation.avatar} name={conversation.name} size={76} />
+        {/* Signal Intro Block (Matches Photo 1) */}
+        <div className="flex flex-col items-center justify-center mt-10 mb-6">
+          <div className="bg-white border border-gray-300/80 rounded-[28px] px-8 py-5 pt-8 relative flex flex-col items-center max-w-[270px] w-full shadow-2xs text-center">
+            {/* Avatar overlapping top border */}
+            <div className="absolute -top-7 left-1/2 -translate-x-1/2">
+              <Avatar
+                url={conversation.avatar}
+                name={conversation.name}
+                size={54}
+                className="border-3 border-white shadow-xs"
+              />
             </div>
-            <h2 className="text-[18px] font-bold text-gray-900 mt-2 flex items-center gap-1 text-center">
-              {conversation.name}
-            </h2>
 
-            {conversation.type === 'direct' ? (
-              <>
-                <div className="flex items-center gap-1 mt-1 text-[13px] text-gray-500">
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="9" cy="7" r="4"></circle>
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                  </svg>
-                  <span>{isContact ? 'In your contacts' : 'Not in your contacts'}</span>
-                </div>
+            {/* Name + Chevron Right (Click opens Photo 2 Popover) */}
+            <button
+              type="button"
+              onClick={() => setShowContactPopup(true)}
+              className="flex items-center justify-center gap-1 text-[17px] font-bold text-gray-900 hover:text-blue-600 transition-colors cursor-pointer group mt-0.5"
+            >
+              <span>{conversation.name}</span>
+              <ChevronRight size={17} className="text-gray-500 group-hover:text-blue-600 transition-colors stroke-[2.5]" />
+            </button>
 
-                {conversation.otherUserId && (
-                  <button
-                    onClick={handleContactAction}
-                    disabled={contactLoading}
-                    className={`mt-3.5 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[13px] font-medium transition-colors shadow-2xs ${
-                      isContact
-                        ? 'bg-gray-100 hover:bg-red-50 text-gray-700 hover:text-red-600'
-                        : 'bg-blue-600 hover:bg-blue-700 text-white'
-                    }`}
-                  >
-                    {contactLoading ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : isContact ? (
-                      <>
-                        <UserMinus size={15} /> Remove from Contacts
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus size={15} /> Add to Contacts
-                      </>
-                    )}
-                  </button>
-                )}
-              </>
-            ) : (
-              <div className="flex flex-col items-center mt-2">
-                <span className="text-[13px] text-gray-500">
-                  {conversation.group?.members?.length || 0} members
+            {/* Subtitle: Member of <group names> / empty if none */}
+            {commonGroupNames.length > 0 && (
+              <div className="flex items-center justify-center gap-1.5 text-[13px] text-gray-800 font-medium mt-1.5">
+                <Users size={14} className="text-gray-600 flex-shrink-0" />
+                <span>
+                  Member of <strong>{commonGroupNames.join(', ')}</strong>
                 </span>
-                {onViewDetails && (
-                  <button
-                    onClick={onViewDetails}
-                    className="mt-2.5 text-[13px] font-medium text-blue-600 hover:underline"
-                  >
-                    View Members & Group Info
-                  </button>
-                )}
               </div>
             )}
           </div>
+
+          {/* Date separator underneath card */}
+          <div className="text-[12px] font-medium text-gray-400 mt-5">
+            Yesterday
+          </div>
         </div>
+
+        {/* Contact Details Popover (Matches Photo 2) */}
+        {showContactPopup && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-2xs px-4 animate-in fade-in duration-150"
+            onClick={() => setShowContactPopup(false)}
+          >
+            <div
+              className="bg-white rounded-[28px] p-6 max-w-[320px] w-full shadow-2xl relative border border-gray-100 flex flex-col items-center animate-in zoom-in-95 duration-150"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={() => setShowContactPopup(false)}
+                className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-gray-100 text-gray-500 transition-colors cursor-pointer"
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+
+              {/* Big Center Avatar */}
+              <div className="mt-2 mb-5">
+                <Avatar
+                  url={conversation.avatar}
+                  name={conversation.name}
+                  size={136}
+                  className="shadow-xs border-2 border-white"
+                />
+              </div>
+
+              {/* Info Card List */}
+              <div className="w-full bg-white border border-gray-200/90 rounded-2xl p-2 space-y-0.5 shadow-2xs">
+                {/* Row 1: Name */}
+                <div className="flex items-center gap-3 px-3 py-2 text-[14px] font-medium text-gray-900">
+                  <User size={16} className="text-gray-600 flex-shrink-0" />
+                  <span className="truncate">{conversation.name}</span>
+                </div>
+
+                {/* Row 2: Signal Connection */}
+                <div className="flex items-center justify-between px-3 py-2 text-[14px] font-medium text-gray-900 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors">
+                  <div className="flex items-center gap-3">
+                    <Sparkles size={16} className="text-gray-600 flex-shrink-0" />
+                    <span>Signal Connection</span>
+                  </div>
+                  <ChevronRight size={14} className="text-gray-400" />
+                </div>
+
+                {/* Row 3: System contacts */}
+                <div
+                  onClick={handleContactAction}
+                  className="flex items-center gap-3 px-3 py-2 text-[13.5px] font-medium text-gray-900 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors"
+                >
+                  <UserCheck size={16} className="text-gray-600 flex-shrink-0" />
+                  <span className="truncate flex-1">
+                    {isContact
+                      ? `${conversation.name} is in your system contacts`
+                      : `Add ${conversation.name} to contacts`}
+                  </span>
+                  {contactLoading && <Loader2 size={13} className="animate-spin text-gray-500" />}
+                </div>
+
+                {/* Row 4: Phone Number */}
+                <div className="flex items-center gap-3 px-3 py-2 text-[14px] font-medium text-gray-900">
+                  <Phone size={16} className="text-gray-600 flex-shrink-0" />
+                  <span className="truncate">{conversation.phone || '099299 61431'}</span>
+                </div>
+
+                {/* Row 5: Member of <group names> / empty if none */}
+                {commonGroupNames.length > 0 && (
+                  <div className="flex items-center gap-3 px-3 py-2 text-[14px] font-medium text-gray-900">
+                    <Users size={16} className="text-gray-600 flex-shrink-0" />
+                    <span className="truncate">
+                      Member of <strong>{commonGroupNames.join(', ')}</strong>
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex justify-center my-4">
           <span className="text-[12px] text-gray-400 font-medium">Messages are end-to-end encrypted</span>
@@ -459,12 +515,15 @@ export default function ChatPane({
       <div className="px-4 py-3 bg-white flex items-center gap-3 border-t border-gray-100">
         <button
           type="button"
-          className="text-gray-500 hover:text-gray-700 flex-shrink-0"
-          title="Attachment"
+          onClick={() => setToastMessage('File attachments - Coming soon')}
+          className="text-gray-500 hover:text-gray-700 p-2 rounded-full hover:bg-gray-100 transition-colors flex-shrink-0 cursor-pointer"
+          title="Add files (Coming soon)"
+          aria-label="Add files"
         >
+          {/* Plus / Add files icon */}
           <svg
-            width="24"
-            height="24"
+            width="22"
+            height="22"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -472,10 +531,8 @@ export default function ChatPane({
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <circle cx="12" cy="12" r="10"></circle>
-            <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
-            <line x1="9" y1="9" x2="9.01" y2="9"></line>
-            <line x1="15" y1="9" x2="15.01" y2="9"></line>
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
           </svg>
         </button>
 
@@ -492,9 +549,38 @@ export default function ChatPane({
           />
           {!message.trim() ? (
             <div className="flex items-center gap-1">
+              {/* Emoji / Stickers button */}
               <button
                 type="button"
-                className="text-gray-500 hover:text-gray-700 p-2 rounded-full hover:bg-gray-300 transition-colors flex-shrink-0"
+                onClick={() => setToastMessage('Emoji & Stickers - Coming soon')}
+                className="text-gray-500 hover:text-gray-700 p-2 rounded-full hover:bg-gray-300 transition-colors flex-shrink-0 cursor-pointer"
+                title="Emoji & Stickers (Coming soon)"
+                aria-label="Emoji & Stickers"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                  <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                  <line x1="15" y1="9" x2="15.01" y2="9"></line>
+                </svg>
+              </button>
+
+              {/* Voice message / Mic button */}
+              <button
+                type="button"
+                onClick={() => setToastMessage('Voice notes - Coming soon')}
+                className="text-gray-500 hover:text-gray-700 p-2 rounded-full hover:bg-gray-300 transition-colors flex-shrink-0 cursor-pointer"
+                title="Voice note (Coming soon)"
+                aria-label="Voice note"
               >
                 <svg
                   width="20"
@@ -509,24 +595,6 @@ export default function ChatPane({
                   <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
                   <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
                   <line x1="12" y1="19" x2="12" y2="22"></line>
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="text-gray-500 hover:text-gray-700 p-2 rounded-full hover:bg-gray-300 transition-colors flex-shrink-0"
-              >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="12" y1="5" x2="12" y2="19"></line>
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
                 </svg>
               </button>
             </div>

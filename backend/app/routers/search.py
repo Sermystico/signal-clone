@@ -21,23 +21,25 @@ def global_search(
     db: Session = Depends(get_db), 
     current_user: models.User = Depends(get_current_user)
 ):
-    normalized_q = normalize_phone(q)
+    raw_q = q.strip()
+    clean_q = raw_q.lstrip("@").strip() or raw_q
+    normalized_q = normalize_phone(raw_q)
     is_phone_query = len(normalized_q) > 3 and any(c.isdigit() for c in normalized_q)
 
     # 1. Search Users (Contacts and other registered users)
     user_query = db.query(models.User).filter(models.User.id != current_user.id)
     if is_phone_query:
         user_query = user_query.filter(
-            (models.User.username.ilike(f"%{q}%")) |
-            (models.User.display_name.ilike(f"%{q}%")) |
+            (models.User.username.ilike(f"%{clean_q}%")) |
+            (models.User.display_name.ilike(f"%{clean_q}%")) |
             (models.User.phone.contains(normalized_q)) |
-            (models.User.phone.contains(q))
+            (models.User.phone.contains(raw_q))
         )
     else:
         user_query = user_query.filter(
-            (models.User.username.ilike(f"%{q}%")) |
-            (models.User.display_name.ilike(f"%{q}%")) |
-            (models.User.phone.ilike(f"%{q}%"))
+            (models.User.username.ilike(f"%{clean_q}%")) |
+            (models.User.display_name.ilike(f"%{clean_q}%")) |
+            (models.User.phone.ilike(f"%{clean_q}%"))
         )
     users = user_query.limit(20).all()
 
