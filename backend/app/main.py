@@ -38,6 +38,10 @@ app.include_router(ws.router)
 from .routers import search
 app.include_router(search.router)
 
+@app.get("/")
+def root():
+    return {"message": "Signal Clone Backend API is running", "docs": "/docs", "health": "/health"}
+
 @app.get("/health")
 def health_check():
     return {"status": "ok", "message": "API is up and running"}
