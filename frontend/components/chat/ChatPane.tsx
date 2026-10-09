@@ -374,14 +374,25 @@ export default function ChatPane({
               </div>
             </div>
 
-            {/* Contact Status Notice (Text-only notice in main chat; disappears when added to contacts) */}
+            {/* Contact Status Notice (In main chat when not in contacts; disappears when added) */}
             {!isContact && (
               <div className="flex justify-center my-2.5 px-4">
-                <div className="flex items-center gap-2 bg-gray-100/90 text-gray-600 border border-gray-200/80 rounded-full px-4 py-1.5 shadow-2xs">
-                  <UserPlus size={14} className="text-gray-500 flex-shrink-0" />
-                  <span className="text-[12.5px] font-medium leading-tight">
-                    This person is not in your contact list
-                  </span>
+                <div className="flex items-center justify-between gap-3 bg-blue-50/90 border border-blue-200/80 rounded-2xl px-4 py-2 max-w-[400px] w-full shadow-2xs">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <UserPlus size={16} className="text-blue-600 flex-shrink-0" />
+                    <span className="text-[13px] text-gray-700 font-medium leading-tight">
+                      This person is not in your contact list
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={contactLoading}
+                    onClick={handleContactAction}
+                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-[12.5px] font-semibold rounded-xl shadow-2xs transition-colors flex-shrink-0 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {contactLoading && <Loader2 size={12} className="animate-spin" />}
+                    <span>Add to contacts</span>
+                  </button>
                 </div>
               </div>
             )}
