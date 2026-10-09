@@ -1,22 +1,66 @@
 # Signal Clone — Real-Time Secure Messaging Application
 
-A full-stack, real-time messaging web application built to mirror the UI, UX, and core workflows of **Signal Desktop**.
+A full-stack, real-time messaging web application built with pixel-level fidelity to mirror the UI, UX, and core workflows of **Signal Desktop**.
 
 ---
 
 ## 🚀 Tech Stack
 
 ### Frontend
-- **Framework:** Next.js (App Router, React 19)
+- **Framework:** Next.js 16 (App Router, React 19) with Turbopack
 - **Language:** TypeScript
-- **Styling:** Tailwind CSS (Custom HSL colors, Glassmorphism, Responsive design)
-- **Icons:** Lucide React
+- **Styling:** Vanilla CSS & Tailwind CSS (Custom HSL palette, Glassmorphism, Signal Dark/Light themes, Responsive layouts)
+- **Icons:** Lucide React & Custom Signal SVGs (Stories segmented icon)
+- **Avatars:** LoremFaces Dynamic Human Avatar API
 
 ### Backend
 - **Framework:** FastAPI (Python 3.12+)
 - **ORM & Database:** SQLAlchemy & SQLite (ACID compliant)
-- **Real-Time Protocol:** WebSockets (Bi-directional async connection manager)
+- **Real-Time Protocol:** WebSockets (Bi-directional async connection manager with presence, typing, and read receipts)
 - **Authentication:** JWT (JSON Web Tokens) with Phone/Username + Mock OTP (`123456`)
+- **Static File Storage:** FastAPI StaticFiles mount for user avatars and message file attachments
+
+---
+
+## ✨ Features & UI/UX Highlights
+
+### 💬 Real-Time Messaging & Chat Experience
+- **Instant Message Delivery:** Sub-millisecond WebSocket broadcasting for 1-on-1 direct chats and multi-user group chats.
+- **Delivery & Read Receipts:** Single check (`sent`), double check (`delivered`), and white double check (`read`).
+- **Live Typing Indicators:** Real-time animated typing bubbles that automatically stop when idle.
+- **Presence Tracking:** Online/Offline green status indicators and human-readable "Last seen" timestamps.
+- **Browser History Integration:** Integrated `popstate` navigation where the Back button closes active conversations smoothly without leaving the app.
+
+### 📎 Media & File Attachments
+- **Multi-Format Support:** Photos, videos, audio clips, PDFs, documents (`.doc`, `.docx`, `.xls`, `.xlsx`, `.ppt`), text files, and archives (`.zip`).
+- **Attachment Preview Bar:** Real-time upload preview bar above the composer with thumbnail, filename, formatted size, and remove button.
+- **Rich Message Cards:**
+  - **Images:** High-res inline image cards with click-to-open **Lightbox Fullscreen Modal** and direct download action.
+  - **Videos & Audio:** Native inline HTML5 media players.
+  - **Documents / Files:** Signal document cards with file type icons, size metadata, and single-click download.
+
+### 😀 Interactive Signal Emoji Picker
+- **5 Categorized Tabs:** Popular (`🔥`), Smileys & People (`😀`), Gestures (`👍`), Hearts & Symbols (`❤️`), and Objects & Tech (`💻`).
+- **Live Keyword Search:** Instant emoji filtering by keywords (e.g., *fire*, *love*, *smile*, *cool*, *party*, *code*, *coffee*).
+- **Click-to-Insert:** Seamless insertion at current cursor position in message input.
+
+### 👤 Contact & Direct Chat Workflows
+- **Contact Intro Card:** Centered contact card with overlapping avatar, name, and expandable chevron details popover.
+- **Non-Contact In-Chat Banner:** Shows *"This person is not in your contact list"* with an `[ Add to contacts ]` action button that automatically disappears once added.
+- **Interactive Contact Popover:** Displays phone number, dynamic shared group membership (`Member of <groups>`), and an interactive Add/Remove contact toggle.
+- **One-Way Contacts:** Removing a contact leaves conversation history accessible and intact.
+
+### 👥 Group Conversations & Admin Management
+- **Group Creation:** Multi-select members workflow with group name and custom avatar.
+- **Admin Privileges:** Admin-only member addition and removal with 403 authorization guards.
+- **Automatic Admin Succession:** When an admin leaves a group, administrative privileges transfer to the senior remaining member.
+- **Clean Group Headers:** Group chats feature dedicated member counts and clean intros without contact popovers.
+
+### ⚙️ Desktop Settings (2-Pane Modal)
+- Full Signal Desktop 2-pane Settings interface:
+  - **Profile:** Edit display name, about bio, view phone number, and copy username (`@username`).
+  - **Appearance:** System, Light, and Dark mode theme selectors.
+  - **Chats, Calls, Notifications, Privacy, and Help:** Granular preference panels.
 
 ---
 
@@ -27,16 +71,18 @@ A full-stack, real-time messaging web application built to mirror the UI, UX, an
 |                     Next.js Frontend                         |
 |  - App Router (/login, /register, /)                         |
 |  - Sidebar Workflow & Left Rail Navigation                    |
-|  - Chat Pane & Responsive Layout                             |
-|  - Real-time WebSocket Event Handler                         |
+|  - Chat Pane, File Composer & Emoji Picker                   |
+|  - Real-time WebSocket Event & Status Manager                |
 +------------------------------+-------------------------------+
                                |
-                               | REST APIs & WebSockets
+                               | REST APIs, StaticFiles & WebSockets
                                v
 +--------------------------------------------------------------+
 |                     FastAPI Backend                          |
-|  - Routers (/auth, /users, /contacts, /conversations, /messages, /ws) |
-|  - ConnectionManager for WebSocket Broadcasting               |
+|  - Routers (/auth, /users, /contacts, /conversations,        |
+|            /messages, /ws)                                   |
+|  - Static Uploads Mount (/uploads) for Attachments & Avatars |
+|  - ConnectionManager for Async WebSocket Broadcasting        |
 |  - Auth Middleware & Dependency Injection                    |
 +------------------------------+-------------------------------+
                                |
@@ -53,8 +99,6 @@ A full-stack, real-time messaging web application built to mirror the UI, UX, an
 
 ## 🗄 Database Schema Design
 
-The SQLite database uses standard foreign key constraints and indexed columns to ensure fast querying and relational integrity.
-
 ### 1. `users`
 - `id` (INTEGER, Primary Key)
 - `username` (VARCHAR, Unique, Indexed)
@@ -70,7 +114,6 @@ The SQLite database uses standard foreign key constraints and indexed columns to
 - `user_id` (INTEGER, Foreign Key -> `users.id`)
 - `contact_user_id` (INTEGER, Foreign Key -> `users.id`)
 - `created_at` (DATETIME, Default: UTC Now)
-*Note: Contacts are strictly unidirectional.*
 
 ### 3. `conversations`
 - `id` (INTEGER, Primary Key)
@@ -80,8 +123,8 @@ The SQLite database uses standard foreign key constraints and indexed columns to
 - `updated_at` (DATETIME, Default: UTC Now)
 
 ### 4. `conversation_members`
-- `conversation_id` (INTEGER, Foreign Key -> `conversations.id`, Composite Primary Key)
-- `user_id` (INTEGER, Foreign Key -> `users.id`, Composite Primary Key)
+- `conversation_id` (INTEGER, Foreign Key -> `conversations.id`, Composite PK)
+- `user_id` (INTEGER, Foreign Key -> `users.id`, Composite PK)
 - `joined_at` (DATETIME, Default: UTC Now)
 - `last_read_message_id` (INTEGER, Default: 0)
 - `last_delivered_message_id` (INTEGER, Default: 0)
@@ -94,8 +137,8 @@ The SQLite database uses standard foreign key constraints and indexed columns to
 - `created_at` (DATETIME, Default: UTC Now)
 
 ### 6. `group_members`
-- `group_id` (INTEGER, Foreign Key -> `groups.id`, Composite Primary Key)
-- `user_id` (INTEGER, Foreign Key -> `users.id`, Composite Primary Key)
+- `group_id` (INTEGER, Foreign Key -> `groups.id`, Composite PK)
+- `user_id` (INTEGER, Foreign Key -> `users.id`, Composite PK)
 - `role` (VARCHAR: `'admin'` or `'member'`, Default: `'member'`)
 - `joined_at` (DATETIME, Default: UTC Now)
 
@@ -103,7 +146,7 @@ The SQLite database uses standard foreign key constraints and indexed columns to
 - `id` (INTEGER, Primary Key)
 - `conversation_id` (INTEGER, Foreign Key -> `conversations.id`)
 - `sender_id` (INTEGER, Foreign Key -> `users.id`)
-- `content` (TEXT)
+- `content` (TEXT, Stores text or rich attachment JSON payload)
 - `status` (VARCHAR: `'sending'`, `'sent'`, `'delivered'`, `'read'`)
 - `created_at` (DATETIME, Default: UTC Now)
 - `read_at` (DATETIME, Nullable)
@@ -115,39 +158,41 @@ The SQLite database uses standard foreign key constraints and indexed columns to
 ### Authentication (`/auth`)
 - `POST /auth/check-phone` — Validates phone number format and checks registration status.
 - `POST /auth/verify-otp` — Verifies OTP code (`123456`).
-- `POST /auth/register` — Registers a new user account with phone, username, and display name.
+- `POST /auth/register` — Registers new account with phone, username, display name, and avatar.
 - `POST /auth/login` — Authenticates by username/display name + OTP.
 - `POST /auth/login/phone` — Authenticates by phone number + OTP.
+- `GET /auth/me` — Fetches authenticated user profile.
 
-### Users (`/users`)
-- `GET /users/search?q={query}` — Searches registered users by name, username, or phone.
-- `POST /users/avatar` — Uploads custom profile picture.
-- `DELETE /users/avatar` — Removes custom profile picture.
+### Users & Search (`/users`)
+- `GET /users/search?q={query}` — Searches registered users by `@username`, name, or phone.
+- `POST /users/avatar` — Uploads custom profile avatar.
+- `DELETE /users/avatar` — Removes custom avatar.
 
 ### Contacts (`/contacts`)
 - `GET /contacts/` — Fetches current user's contact list.
-- `POST /contacts/{contact_user_id}` — Adds target user to current user's contacts.
-- `DELETE /contacts/{contact_user_id}` — Removes target user from current user's contacts.
+- `POST /contacts/{contact_user_id}` — Adds target user to contacts.
+- `DELETE /contacts/{contact_user_id}` — Removes target user from contacts.
 
-### Conversations (`/conversations`)
-- `GET /conversations/` — Lists all conversations for current user with unread counts and last message preview.
-- `POST /conversations/direct` — Gets or creates a direct conversation between two users.
-- `POST /conversations/group` — Creates a new group conversation with creator assigned as admin.
-- `GET /conversations/{conversation_id}` — Fetches group/conversation details and member list.
-- `POST /conversations/{conversation_id}/members` — Adds a user to group (Admin only).
-- `DELETE /conversations/{conversation_id}/members/{user_id}` — Removes a member from group (Admin only).
-- `DELETE /conversations/{conversation_id}/leave` — Leaves group with auto-admin succession.
+### Conversations & Groups (`/conversations`)
+- `GET /conversations/` — Lists all conversations with unread counts and latest messages.
+- `POST /conversations/direct` — Retrieves or creates direct 1-on-1 conversation.
+- `POST /conversations/group` — Creates group conversation with creator as admin.
+- `GET /conversations/{conversation_id}` — Fetches group details and member list.
+- `POST /conversations/{conversation_id}/members` — Adds member to group (Admin only).
+- `DELETE /conversations/{conversation_id}/members/{user_id}` — Removes member from group (Admin only).
+- `DELETE /conversations/{conversation_id}/leave` — Leaves group with automatic admin promotion.
 
-### Messages (`/messages`)
-- `GET /messages/{conversation_id}` — Fetches message history for a conversation (Member authorized).
-- `POST /messages/` — Sends a message to a conversation and broadcasts via WebSockets.
+### Messages & File Uploads (`/messages`)
+- `GET /messages/{conversation_id}` — Fetches message history for a conversation.
+- `POST /messages/` — Sends a message and triggers async WebSocket broadcasts.
+- `POST /messages/upload` — Uploads file/image attachment to static storage.
 
 ### WebSockets (`/ws`)
-- `WS /ws?token={jwt_token}` — Real-time bidirectional connection for:
-  - `message.new` — Instant delivery of new direct/group messages.
-  - `message.status` — Delivery and read receipts update.
-  - `typing.start` / `typing.stop` — Live typing indicators.
-  - `presence.update` — Online / offline status & last seen.
+- `WS /ws?token={jwt_token}` — Real-time bidirectional connection:
+  - `message.new` — Instant delivery of messages and media attachments.
+  - `message.status` — Real-time delivery and read receipt acknowledgments.
+  - `typing.start` / `typing.stop` — Live typing notifications.
+  - `presence.update` — Instant online/offline status updates.
 
 ---
 
@@ -161,6 +206,7 @@ The SQLite database uses standard foreign key constraints and indexed columns to
 ```bash
 cd backend
 python -m venv venv
+
 # On Windows:
 venv\Scripts\activate
 # On Linux/macOS:
@@ -181,28 +227,6 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## ☁️ Deployment Instructions
-
-### Frontend (Vercel)
-1. Import the repository into Vercel and set the framework to **Next.js**.
-2. Set the `Root Directory` to `frontend`.
-3. Add the following environment variable:
-   - `NEXT_PUBLIC_API_URL`: Your deployed Render backend URL (e.g., `https://signal-clone-backend.onrender.com`).
-4. Deploy.
-
-### Backend (Render)
-1. Create a new **Web Service** on Render connected to this repository.
-2. Set the `Root Directory` to `backend`.
-3. Set the `Build Command` to `pip install -r requirements.txt`.
-4. Set the `Start Command` to `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
-5. Under **Advanced**, add a **Persistent Disk** mounted at `/data` (to preserve the SQLite database).
-6. Add the following environment variables:
-   - `DATABASE_URL`: `sqlite:////data/sql_app.db`
-   - `ALLOWED_ORIGINS`: Your deployed Vercel frontend URL (e.g., `https://signal-clone-frontend.vercel.app`).
-7. Deploy.
-
----
-
 ## 🧪 Demo Test Credentials
 
 The database is pre-seeded with sample users, contacts, and active conversations:
@@ -218,9 +242,22 @@ The database is pre-seeded with sample users, contacts, and active conversations
 
 ---
 
-## 📌 Key Assumptions Made
+## ☁️ Deployment Instructions
 
-1. **Mock OTP Authentication:** Real SMS API integration is mocked with fixed development code `123456` as permitted.
-2. **One-Way Contacts:** Adding User B to User A's contacts is one-way. Removing a contact does not delete direct conversation history.
-3. **Admin Succession:** When a group admin leaves, administrative privileges are automatically transferred to the oldest remaining member.
-4. **End-to-End Encryption:** E2EE status notices and security lock badges are UI-simulated per the specification.
+### Frontend (Vercel)
+1. Import repository into Vercel and select **Next.js** framework.
+2. Set `Root Directory` to `frontend`.
+3. Add environment variable:
+   - `NEXT_PUBLIC_API_URL`: Your backend URL (e.g., `https://signal-clone-backend.onrender.com`).
+4. Deploy.
+
+### Backend (Render)
+1. Create a **Web Service** on Render connected to this repository.
+2. Set `Root Directory` to `backend`.
+3. Set `Build Command` to `pip install -r requirements.txt`.
+4. Set `Start Command` to `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
+5. Under **Advanced**, add a **Persistent Disk** mounted at `/data` (to preserve SQLite database and file uploads).
+6. Add environment variables:
+   - `DATABASE_URL`: `sqlite:////data/sql_app.db`
+   - `ALLOWED_ORIGINS`: Your Vercel frontend URL (e.g., `https://signal-clone-frontend.vercel.app`).
+7. Deploy.
