@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { KeyRound, ArrowLeft, Camera, Trash2 } from "lucide-react";
+import { KeyRound, ArrowLeft, Camera, Trash2, Check, Sparkles, Upload } from "lucide-react";
 import Avatar from "@/components/ui/Avatar";
 
 const COUNTRY_CODES = [
@@ -18,6 +18,17 @@ const COUNTRY_CODES = [
   { code: "+971", country: "AE", name: "UAE (+971)" },
 ];
 
+const PRESET_AVATARS = [
+  { id: 1, url: "https://www.loremfaces.net/128/id/1.jpg", label: "Avatar 1" },
+  { id: 2, url: "https://www.loremfaces.net/128/id/2.jpg", label: "Avatar 2" },
+  { id: 3, url: "https://www.loremfaces.net/128/id/3.jpg", label: "Avatar 3" },
+  { id: 4, url: "https://www.loremfaces.net/128/id/4.jpg", label: "Avatar 4" },
+  { id: 5, url: "https://www.loremfaces.net/128/id/5.jpg", label: "Avatar 5" },
+  { id: 6, url: "https://www.loremfaces.net/128/id/6.jpg", label: "Avatar 6" },
+  { id: 7, url: "https://www.loremfaces.net/128/id/7.jpg", label: "Avatar 7" },
+  { id: 8, url: "https://www.loremfaces.net/128/id/8.jpg", label: "Avatar 8" },
+];
+
 export default function RegisterPage() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   
@@ -28,9 +39,11 @@ export default function RegisterPage() {
   // Step 2: OTP
   const [otp, setOtp] = useState("123456");
   
-  // Step 3: Profile
+  // Step 3: Profile & Avatar Selection
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [avatarMode, setAvatarMode] = useState<"preset" | "custom">("preset");
+  const [selectedPresetUrl, setSelectedPresetUrl] = useState<string>(PRESET_AVATARS[0].url);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -130,6 +143,20 @@ export default function RegisterPage() {
     }
   };
 
+  // Handle Preset Avatar selection
+  const handleSelectPreset = (url: string) => {
+    setSelectedPresetUrl(url);
+    setAvatarMode("preset");
+    if (avatarPreview) {
+      URL.revokeObjectURL(avatarPreview);
+      setAvatarPreview(null);
+    }
+    setAvatarFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   // Handle Avatar file selection
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -137,6 +164,7 @@ export default function RegisterPage() {
       setAvatarFile(file);
       const previewUrl = URL.createObjectURL(file);
       setAvatarPreview(previewUrl);
+      setAvatarMode("custom");
     }
   };
 
@@ -146,6 +174,7 @@ export default function RegisterPage() {
       URL.revokeObjectURL(avatarPreview);
     }
     setAvatarPreview(null);
+    setAvatarMode("preset");
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -172,8 +201,8 @@ export default function RegisterPage() {
 
     try {
       const fullPhone = getNormalizedPhone();
-      const faceId = (cleanUsername.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 5) + 1;
-      const defaultAvatar = `https://www.loremfaces.net/128/id/${faceId}.jpg`;
+      // Use selected preset as initial avatar url
+      const initialAvatarUrl = avatarMode === "preset" ? selectedPresetUrl : selectedPresetUrl;
 
       const res = await fetch(`${API_URL}/auth/register`, {
         method: "POST",
@@ -183,7 +212,7 @@ export default function RegisterPage() {
           username: cleanUsername,
           display_name: cleanDisplayName,
           otp: otp.trim(),
-          avatar_url: defaultAvatar,
+          avatar_url: initialAvatarUrl,
         }),
       });
 
@@ -198,7 +227,7 @@ export default function RegisterPage() {
       const token = data.access_token;
 
       // If user uploaded a custom avatar, upload it via /users/avatar
-      if (avatarFile) {
+      if (avatarMode === "custom" && avatarFile) {
         try {
           const formData = new FormData();
           formData.append("file", avatarFile);
@@ -210,7 +239,7 @@ export default function RegisterPage() {
             body: formData,
           });
         } catch (uploadErr) {
-          console.warn("Avatar upload failed, continuing with default avatar", uploadErr);
+          console.warn("Avatar upload failed, continuing with preset avatar", uploadErr);
         }
       }
 
@@ -222,6 +251,10 @@ export default function RegisterPage() {
       setLoading(false);
     }
   };
+
+  const currentPreviewUrl = avatarMode === "custom" && avatarPreview 
+    ? avatarPreview 
+    : selectedPresetUrl;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
@@ -263,7 +296,7 @@ export default function RegisterPage() {
           <p className="text-sm text-gray-500 mt-1">
             {step === 1 && "Signal will verify your phone number using a mock OTP."}
             {step === 2 && `We sent a mock code to ${getNormalizedPhone()}`}
-            {step === 3 && "Choose how you appear to others on Signal."}
+            {step === 3 && "Choose an avatar or upload a custom photo for your profile."}
           </p>
         </div>
 
@@ -321,7 +354,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white font-medium py-2.5 px-4 rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 shadow-sm transition-all text-sm"
+              className="w-full bg-blue-600 text-white font-medium py-2.5 px-4 rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 shadow-sm transition-all text-sm cursor-pointer"
             >
               {loading ? "Checking Number..." : "Continue"}
             </button>
@@ -360,32 +393,34 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white font-medium py-2.5 px-4 rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 shadow-sm transition-all text-sm"
+              className="w-full bg-blue-600 text-white font-medium py-2.5 px-4 rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 shadow-sm transition-all text-sm cursor-pointer"
             >
               {loading ? "Verifying..." : "Verify Code"}
             </button>
           </form>
         )}
 
-        {/* STEP 3: Profile Setup */}
+        {/* STEP 3: Profile Setup & Avatar Options */}
         {step === 3 && (
           <form onSubmit={handleProfileSubmit} className="space-y-5">
-            {/* Avatar Preview & Upload */}
+            {/* Main Avatar Preview */}
             <div className="flex flex-col items-center justify-center">
-              <div className="relative group mb-2">
+              <div className="relative group mb-1">
                 <Avatar
-                  url={avatarPreview || (username ? `https://www.loremfaces.net/128/id/${(username.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 5) + 1}.jpg` : undefined)}
+                  url={currentPreviewUrl}
                   name={displayName || username || "New User"}
-                  size={84}
-                  className="shadow-md border-2 border-gray-100"
+                  size={88}
+                  className="shadow-md border-3 border-white ring-2 ring-gray-200 object-cover"
                 />
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="absolute bottom-0 right-0 bg-blue-600 text-white p-1.5 rounded-full shadow-md hover:bg-blue-700 transition-colors"
-                  title="Upload profile photo"
+                  onClick={() => {
+                    fileInputRef.current?.click();
+                  }}
+                  className="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full shadow-md hover:bg-blue-700 transition-transform active:scale-95 cursor-pointer"
+                  title="Upload custom photo"
                 >
-                  <Camera size={14} />
+                  <Camera size={15} />
                 </button>
                 <input
                   type="file"
@@ -396,18 +431,146 @@ export default function RegisterPage() {
                 />
               </div>
 
-              {avatarPreview && (
-                <button
-                  type="button"
-                  onClick={handleRemoveAvatar}
-                  className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 transition-colors"
-                >
-                  <Trash2 size={12} />
-                  <span>Remove custom photo</span>
-                </button>
+              {avatarMode === "custom" && avatarPreview ? (
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className="text-[11px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    Custom photo chosen
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleRemoveAvatar}
+                    className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <Trash2 size={12} />
+                    <span>Reset</span>
+                  </button>
+                </div>
+              ) : (
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Preset avatar selected
+                </p>
               )}
             </div>
 
+            {/* Avatar Selection Option Menu */}
+            <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-3.5 space-y-3">
+              {/* Option Mode Selector Tabs */}
+              <div className="flex items-center p-1 bg-gray-200/70 rounded-xl text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setAvatarMode("preset")}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    avatarMode === "preset"
+                      ? "bg-white text-gray-900 shadow-xs"
+                      : "text-gray-500 hover:text-gray-900"
+                  }`}
+                >
+                  <Sparkles size={13} className={avatarMode === "preset" ? "text-blue-600" : ""} />
+                  <span>Choose Avatar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAvatarMode("custom");
+                    if (!avatarFile) {
+                      fileInputRef.current?.click();
+                    }
+                  }}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    avatarMode === "custom"
+                      ? "bg-white text-gray-900 shadow-xs"
+                      : "text-gray-500 hover:text-gray-900"
+                  }`}
+                >
+                  <Upload size={13} className={avatarMode === "custom" ? "text-blue-600" : ""} />
+                  <span>Upload Photo</span>
+                </button>
+              </div>
+
+              {/* Tab 1: Preset Avatars Grid */}
+              {avatarMode === "preset" && (
+                <div className="pt-1">
+                  <div className="grid grid-cols-4 gap-2.5 justify-items-center">
+                    {PRESET_AVATARS.map((preset) => {
+                      const isSelected = selectedPresetUrl === preset.url && avatarMode === "preset";
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => handleSelectPreset(preset.url)}
+                          className={`relative group rounded-full p-0.5 transition-all cursor-pointer focus:outline-none ${
+                            isSelected
+                              ? "ring-2 ring-blue-600 scale-105"
+                              : "hover:scale-105 opacity-80 hover:opacity-100"
+                          }`}
+                          title={preset.label}
+                        >
+                          <Avatar
+                            url={preset.url}
+                            name={preset.label}
+                            size={44}
+                            className="rounded-full shadow-2xs"
+                          />
+                          {isSelected && (
+                            <span className="absolute -bottom-0.5 -right-0.5 bg-blue-600 text-white rounded-full p-0.5 shadow-sm border border-white">
+                              <Check size={10} strokeWidth={3} />
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 2: Custom Photo Upload Box */}
+              {avatarMode === "custom" && (
+                <div className="pt-1">
+                  {avatarPreview ? (
+                    <div className="flex items-center justify-between p-2.5 bg-white border border-gray-200 rounded-xl">
+                      <div className="flex items-center gap-2.5">
+                        <Avatar
+                          url={avatarPreview}
+                          name="Custom Photo"
+                          size={38}
+                          className="rounded-full border border-gray-200"
+                        />
+                        <div className="text-left">
+                          <p className="text-xs font-semibold text-gray-800 truncate max-w-[170px]">
+                            {avatarFile?.name || "Custom image"}
+                          </p>
+                          <p className="text-[10px] text-gray-400">
+                            {avatarFile ? `${(avatarFile.size / 1024).toFixed(1)} KB` : "Selected"}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="text-xs font-medium text-blue-600 hover:text-blue-700 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors cursor-pointer"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-gray-300 hover:border-blue-500 rounded-xl p-4 text-center cursor-pointer transition-colors bg-white/70 hover:bg-blue-50/30 group"
+                    >
+                      <Upload size={22} className="mx-auto text-gray-400 group-hover:text-blue-600 mb-1 transition-colors" />
+                      <p className="text-xs font-medium text-gray-700 group-hover:text-blue-700">
+                        Click to upload your image
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        PNG, JPG, JPEG, GIF or WEBP
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Display Name & Username fields */}
             <div>
               <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
                 Display Name
@@ -440,7 +603,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white font-medium py-2.5 px-4 rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 shadow-sm transition-all text-sm"
+              className="w-full bg-blue-600 text-white font-medium py-2.5 px-4 rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 shadow-sm transition-all text-sm cursor-pointer"
             >
               {loading ? "Creating Account..." : "Complete Registration"}
             </button>
