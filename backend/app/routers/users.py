@@ -49,6 +49,17 @@ def upload_avatar(
     db.refresh(current_user)
     return current_user
 
+@router.put("/avatar", response_model=schemas.UserResponse)
+def update_avatar_url(
+    payload: schemas.AvatarUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    current_user.avatar_url = payload.avatar_url
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
 @router.delete("/avatar", response_model=schemas.UserResponse)
 def remove_avatar(
     db: Session = Depends(get_db),

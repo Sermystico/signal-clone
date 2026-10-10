@@ -16,9 +16,24 @@ import {
   MoreHorizontal,
   AtSign,
   Trash2,
+  Camera,
+  Sparkles,
+  Upload,
+  Check,
 } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
 import { User } from '@/contexts/AuthContext';
+
+const PRESET_AVATARS = [
+  { id: 1, url: 'https://api.dicebear.com/7.x/open-peeps/svg?seed=Felix&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf', label: 'Felix' },
+  { id: 2, url: 'https://api.dicebear.com/7.x/open-peeps/svg?seed=Aneka&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf', label: 'Aneka' },
+  { id: 3, url: 'https://api.dicebear.com/7.x/open-peeps/svg?seed=Milo&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf', label: 'Milo' },
+  { id: 4, url: 'https://api.dicebear.com/7.x/open-peeps/svg?seed=Bella&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf', label: 'Bella' },
+  { id: 5, url: 'https://api.dicebear.com/7.x/open-peeps/svg?seed=Leo&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf', label: 'Leo' },
+  { id: 6, url: 'https://api.dicebear.com/7.x/open-peeps/svg?seed=Zoe&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf', label: 'Zoe' },
+  { id: 7, url: 'https://api.dicebear.com/7.x/open-peeps/svg?seed=Jasper&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf', label: 'Jasper' },
+  { id: 8, url: 'https://api.dicebear.com/7.x/open-peeps/svg?seed=Maya&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf', label: 'Maya' },
+];
 
 interface ProfileModalProps {
   user: User;
@@ -47,6 +62,8 @@ export default function ProfileModal({ user, onClose, onLogout, onUpdateAvatar }
   const [aboutText, setAboutText] = useState('Available');
   const [isEditingAbout, setIsEditingAbout] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [avatarTab, setAvatarTab] = useState<'initials' | 'presets' | 'upload'>('presets');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -56,6 +73,29 @@ export default function ProfileModal({ user, onClose, onLogout, onUpdateAvatar }
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 2500);
+  };
+
+  const handleSelectPreset = async (url: string | null) => {
+    try {
+      const res = await fetch(`${API_URL}/users/avatar`, {
+        method: url ? 'PUT' : 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+        ...(url ? { body: JSON.stringify({ avatar_url: url }) } : {}),
+      });
+      if (res.ok) {
+        const updatedUser = await res.json();
+        onUpdateAvatar(updatedUser.avatar_url);
+        showToast(url ? 'Profile avatar updated' : 'Profile photo removed');
+      } else {
+        showToast('Failed to update avatar');
+      }
+    } catch (err) {
+      console.error('Failed to update avatar preset', err);
+      showToast('Failed to update avatar');
+    }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -75,6 +115,7 @@ export default function ProfileModal({ user, onClose, onLogout, onUpdateAvatar }
           const updatedUser = await res.json();
           onUpdateAvatar(updatedUser.avatar_url);
           showToast('Profile photo updated');
+          setShowAvatarPicker(false);
         }
       } catch (err) {
         console.error('Failed to upload avatar', err);
@@ -87,21 +128,7 @@ export default function ProfileModal({ user, onClose, onLogout, onUpdateAvatar }
   };
 
   const handleRemovePhoto = async () => {
-    try {
-      const res = await fetch(`${API_URL}/users/avatar`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-      if (res.ok) {
-        onUpdateAvatar(null);
-        showToast('Profile photo removed');
-      }
-    } catch (err) {
-      console.error('Failed to remove avatar', err);
-      showToast('Failed to remove photo');
-    }
+    await handleSelectPreset(null);
   };
 
   const navItems: { id: SettingsSection; label: string; icon: React.ReactNode }[] = [
@@ -211,29 +238,45 @@ export default function ProfileModal({ user, onClose, onLogout, onUpdateAvatar }
 
             {/* Avatar & Edit Photo */}
             <div className="flex flex-col items-center mb-6">
-              <Avatar
-                url={user.avatar_url}
-                name={user.display_name || user.username}
-                size={96}
-                className="border-2 border-gray-100 shadow-sm"
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="mt-3 text-[13px] font-medium text-gray-800 bg-[#EFEFEF] hover:bg-gray-200 px-3.5 py-1 rounded-full transition-colors cursor-pointer"
-              >
-                Edit photo
-              </button>
-
-              {user.avatar_url && (
+              <div className="relative group cursor-pointer" onClick={() => setShowAvatarPicker(true)}>
+                <Avatar
+                  url={user.avatar_url}
+                  name={user.display_name || user.username}
+                  size={96}
+                  className="border-3 border-white ring-2 ring-gray-200 shadow-sm object-cover"
+                />
                 <button
                   type="button"
-                  onClick={handleRemovePhoto}
-                  className="mt-2 text-[12px] text-red-500 hover:text-red-700 flex items-center gap-1 cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowAvatarPicker(true);
+                  }}
+                  className="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full shadow-md hover:bg-blue-700 transition-transform active:scale-95 cursor-pointer"
+                  title="Change profile avatar"
                 >
-                  <Trash2 size={12} /> Remove photo
+                  <Camera size={15} />
                 </button>
-              )}
+              </div>
+
+              <div className="flex items-center gap-2 mt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAvatarPicker(true)}
+                  className="text-[13px] font-medium text-gray-800 bg-[#EFEFEF] hover:bg-gray-200 px-3.5 py-1 rounded-full transition-colors cursor-pointer"
+                >
+                  Change avatar
+                </button>
+
+                {user.avatar_url && (
+                  <button
+                    type="button"
+                    onClick={handleRemovePhoto}
+                    className="text-[12px] text-red-500 hover:text-red-700 flex items-center gap-1 cursor-pointer px-2 py-1 rounded-full hover:bg-red-50 transition-colors"
+                  >
+                    <Trash2 size={12} /> Remove
+                  </button>
+                )}
+              </div>
 
               <input
                 type="file"
@@ -243,6 +286,153 @@ export default function ProfileModal({ user, onClose, onLogout, onUpdateAvatar }
                 className="hidden"
               />
             </div>
+
+            {/* Avatar Picker Modal */}
+            {showAvatarPicker && (
+              <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+                <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-gray-100 flex flex-col">
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-[16px] font-bold text-gray-900">Change Profile Photo</h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowAvatarPicker(false)}
+                      className="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  {/* Tabs */}
+                  <div className="flex items-center p-1 bg-gray-100 rounded-xl text-xs font-semibold mb-4 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setAvatarTab('initials')}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                        avatarTab === 'initials'
+                          ? 'bg-white text-gray-900 shadow-xs'
+                          : 'text-gray-500 hover:text-gray-900'
+                      }`}
+                    >
+                      <UserIcon size={13} className={avatarTab === 'initials' ? 'text-blue-600' : ''} />
+                      <span>Initials</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAvatarTab('presets')}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                        avatarTab === 'presets'
+                          ? 'bg-white text-gray-900 shadow-xs'
+                          : 'text-gray-500 hover:text-gray-900'
+                      }`}
+                    >
+                      <Sparkles size={13} className={avatarTab === 'presets' ? 'text-blue-600' : ''} />
+                      <span>Presets</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAvatarTab('upload');
+                        fileInputRef.current?.click();
+                      }}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                        avatarTab === 'upload'
+                          ? 'bg-white text-gray-900 shadow-xs'
+                          : 'text-gray-500 hover:text-gray-900'
+                      }`}
+                    >
+                      <Upload size={13} className={avatarTab === 'upload' ? 'text-blue-600' : ''} />
+                      <span>Upload</span>
+                    </button>
+                  </div>
+
+                  {/* Tab 1: Initials Mode */}
+                  {avatarTab === 'initials' && (
+                    <div className="flex flex-col items-center text-center p-3 bg-gray-50 rounded-xl border border-gray-100">
+                      <Avatar
+                        url={null}
+                        name={displayName || user.display_name || user.username}
+                        size={64}
+                        className="shadow-sm mb-3"
+                      />
+                      <p className="text-xs font-semibold text-gray-800">Use Name Initials</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5 mb-3.5">
+                        Display your colorful initials avatar instead of a photo.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await handleSelectPreset(null);
+                          setShowAvatarPicker(false);
+                        }}
+                        className="w-full py-2 px-3 bg-blue-600 text-white text-xs font-medium rounded-xl hover:bg-blue-700 transition-colors shadow-xs cursor-pointer"
+                      >
+                        Apply Initials Avatar
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Tab 2: Presets (OpenPeeps) */}
+                  {avatarTab === 'presets' && (
+                    <div className="space-y-3">
+                      <p className="text-[11px] text-gray-500 text-center">
+                        Select an OpenPeeps avatar character:
+                      </p>
+                      <div className="grid grid-cols-4 gap-2.5 justify-items-center p-2.5 bg-gray-50 rounded-xl border border-gray-100">
+                        {PRESET_AVATARS.map((preset) => {
+                          const isSelected = user.avatar_url === preset.url;
+                          return (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              onClick={async () => {
+                                await handleSelectPreset(preset.url);
+                              }}
+                              className={`relative group rounded-full p-0.5 transition-all cursor-pointer focus:outline-none ${
+                                isSelected
+                                  ? 'ring-2 ring-blue-600 scale-105'
+                                  : 'hover:scale-105 opacity-85 hover:opacity-100'
+                              }`}
+                              title={preset.label}
+                            >
+                              <Avatar
+                                url={preset.url}
+                                name={preset.label}
+                                size={46}
+                                className="rounded-full shadow-2xs"
+                              />
+                              {isSelected && (
+                                <span className="absolute -bottom-0.5 -right-0.5 bg-blue-600 text-white rounded-full p-0.5 shadow-sm border border-white">
+                                  <Check size={10} strokeWidth={3} />
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tab 3: Upload Custom Photo */}
+                  {avatarTab === 'upload' && (
+                    <div className="space-y-3">
+                      <div
+                        onClick={() => fileInputRef.current?.click()}
+                        className="border-2 border-dashed border-gray-300 hover:border-blue-500 rounded-xl p-6 text-center cursor-pointer transition-colors bg-gray-50 hover:bg-blue-50/30 group"
+                      >
+                        <Upload size={24} className="mx-auto text-gray-400 group-hover:text-blue-600 mb-1.5 transition-colors" />
+                        <p className="text-xs font-semibold text-gray-700 group-hover:text-blue-700">
+                          Click to select a file from device
+                        </p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">
+                          Supports PNG, JPG, JPEG, GIF or WEBP
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Profile Info Card 1: Display Name & About */}
             <div className="w-full bg-white border border-gray-200/90 rounded-2xl overflow-hidden shadow-2xs">

@@ -15,6 +15,9 @@ class UserCreate(BaseModel):
     otp: str
     avatar_url: Optional[str] = None
 
+class AvatarUpdate(BaseModel):
+    avatar_url: Optional[str] = None
+
 class UserLogin(BaseModel):
     username: Optional[str] = None
     identifier: Optional[str] = None
