@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
+from typing import Dict, Any
 from ..database import get_db
 from .. import models, schemas
 from ..auth import get_current_user
-from sqlalchemy import or_, desc
+from sqlalchemy import desc
 import re
 
 router = APIRouter(prefix="/search", tags=["search"])

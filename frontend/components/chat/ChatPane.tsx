@@ -17,10 +17,8 @@ import {
   UserMinus,
   X,
   Loader2,
-  Paperclip,
   FileText,
   Download,
-  Image as ImageIcon,
   Smile,
   Plus,
   Maximize2,
@@ -307,7 +305,7 @@ export default function ChatPane({
     try {
       await onToggleContact(conversation.otherUserId, isContact);
       setToastMessage(isContact ? 'Removed from contacts' : 'Added to contacts');
-    } catch (err) {
+    } catch {
       setToastMessage('Failed to update contact');
     } finally {
       setContactLoading(false);

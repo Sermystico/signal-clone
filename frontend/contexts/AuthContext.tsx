@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [pathname, router]);
+  }, [API_URL, pathname, router]);
 
   useEffect(() => {
     const storedToken = localStorage.getItem('token');

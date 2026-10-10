@@ -22,7 +22,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from .routers import auth, users, contacts, conversations, messages, ws
+from .routers import auth, users, contacts, conversations, messages, ws, search
 import os
 from fastapi.staticfiles import StaticFiles
 
@@ -35,7 +35,6 @@ app.include_router(contacts.router)
 app.include_router(conversations.router)
 app.include_router(messages.router)
 app.include_router(ws.router)
-from .routers import search
 app.include_router(search.router)
 
 @app.get("/")

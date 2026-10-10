@@ -54,7 +54,7 @@ export default function NewGroupSidebar({
         } else {
           if (isMounted) setError('Failed to load users.');
         }
-      } catch (err) {
+      } catch {
         if (isMounted) setError('Network error loading users.');
       } finally {
         if (isMounted) setLoading(false);
@@ -105,7 +105,7 @@ export default function NewGroupSidebar({
         const errData = await res.json().catch(() => ({}));
         setError(errData.detail || 'Failed to create group.');
       }
-    } catch (err) {
+    } catch {
       setError('Network error creating group.');
     } finally {
       setCreating(false);

@@ -45,10 +45,8 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...), db: 
                 models.Message.id > (member.last_delivered_message_id or 0)
             ).all()
             
-            senders_to_notify = set()
             max_id = 0
             for msg in undelivered:
-                senders_to_notify.add((msg.sender_id, msg.id))
                 if msg.id > max_id:
                     max_id = msg.id
                     
@@ -58,11 +56,6 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...), db: 
                 for msg in undelivered:
                     if msg.status == 'sent':
                         msg.status = 'delivered'
-                        
-                for sender_id, msg_id in senders_to_notify:
-                    # Don't await in loop, just let it run or create tasks
-                    # We will do it synchronously here since it's just a few messages usually
-                    pass
         
         db.commit()
         

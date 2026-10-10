@@ -56,7 +56,7 @@ export default function GroupDetailsModal({
           } else {
             setError('Failed to load users.');
           }
-        } catch (err) {
+        } catch {
           setError('Network error loading users.');
         } finally {
           setLoading(false);
@@ -86,10 +86,10 @@ export default function GroupDetailsModal({
         onUpdate();
         setActiveTab('members');
       } else {
-        const err = await res.json().catch(() => ({}));
-        setError(err.detail || 'Failed to add member.');
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.detail || 'Failed to add member.');
       }
-    } catch (err) {
+    } catch {
       setError('Network error occurred.');
     } finally {
       setActionLoading(null);
@@ -111,10 +111,10 @@ export default function GroupDetailsModal({
         setSuccessMsg('Member removed successfully');
         onUpdate();
       } else {
-        const err = await res.json().catch(() => ({}));
-        setError(err.detail || 'Failed to remove member.');
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.detail || 'Failed to remove member.');
       }
-    } catch (err) {
+    } catch {
       setError('Network error occurred.');
     } finally {
       setActionLoading(null);
@@ -134,10 +134,10 @@ export default function GroupDetailsModal({
         onUpdate();
         onClose();
       } else {
-        const err = await res.json().catch(() => ({}));
-        setError(err.detail || 'Failed to leave group.');
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.detail || 'Failed to leave group.');
       }
-    } catch (err) {
+    } catch {
       setError('Network error occurred.');
     }
   };
