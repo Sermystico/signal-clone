@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { KeyRound, ArrowLeft, Camera, Trash2, Check, Sparkles, Upload } from "lucide-react";
+import { KeyRound, ArrowLeft, Camera, Trash2, Check, Sparkles, Upload, User as UserIcon } from "lucide-react";
 import Avatar from "@/components/ui/Avatar";
 
 const COUNTRY_CODES = [
@@ -42,7 +42,7 @@ export default function RegisterPage() {
   // Step 3: Profile & Avatar Selection
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [avatarMode, setAvatarMode] = useState<"preset" | "custom">("preset");
+  const [avatarMode, setAvatarMode] = useState<"initials" | "preset" | "custom">("preset");
   const [selectedPresetUrl, setSelectedPresetUrl] = useState<string>(PRESET_AVATARS[0].url);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -174,7 +174,7 @@ export default function RegisterPage() {
       URL.revokeObjectURL(avatarPreview);
     }
     setAvatarPreview(null);
-    setAvatarMode("preset");
+    setAvatarMode("initials");
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -201,8 +201,12 @@ export default function RegisterPage() {
 
     try {
       const fullPhone = getNormalizedPhone();
-      // Use selected preset as initial avatar url
-      const initialAvatarUrl = avatarMode === "preset" ? selectedPresetUrl : selectedPresetUrl;
+      
+      // Determine avatar_url: preset url if preset mode, or null if initials/custom
+      let initialAvatarUrl: string | null = null;
+      if (avatarMode === "preset") {
+        initialAvatarUrl = selectedPresetUrl;
+      }
 
       const res = await fetch(`${API_URL}/auth/register`, {
         method: "POST",
@@ -226,7 +230,7 @@ export default function RegisterPage() {
 
       const token = data.access_token;
 
-      // If user uploaded a custom avatar, upload it via /users/avatar
+      // If user selected custom photo, upload it via /users/avatar
       if (avatarMode === "custom" && avatarFile) {
         try {
           const formData = new FormData();
@@ -239,7 +243,7 @@ export default function RegisterPage() {
             body: formData,
           });
         } catch (uploadErr) {
-          console.warn("Avatar upload failed, continuing with preset avatar", uploadErr);
+          console.warn("Avatar upload failed, continuing with default avatar", uploadErr);
         }
       }
 
@@ -252,9 +256,12 @@ export default function RegisterPage() {
     }
   };
 
-  const currentPreviewUrl = avatarMode === "custom" && avatarPreview 
-    ? avatarPreview 
-    : selectedPresetUrl;
+  const currentPreviewUrl = 
+    avatarMode === "initials"
+      ? null
+      : avatarMode === "custom" && avatarPreview 
+        ? avatarPreview 
+        : selectedPresetUrl;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
@@ -445,6 +452,10 @@ export default function RegisterPage() {
                     <span>Reset</span>
                   </button>
                 </div>
+              ) : avatarMode === "initials" ? (
+                <p className="text-[11px] text-gray-500 font-medium mt-1">
+                  Initials avatar (No photo)
+                </p>
               ) : (
                 <p className="text-[11px] text-gray-400 mt-1">
                   Preset avatar selected
@@ -455,7 +466,19 @@ export default function RegisterPage() {
             {/* Avatar Selection Option Menu */}
             <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-3.5 space-y-3">
               {/* Option Mode Selector Tabs */}
-              <div className="flex items-center p-1 bg-gray-200/70 rounded-xl text-xs font-semibold">
+              <div className="flex items-center p-1 bg-gray-200/70 rounded-xl text-xs font-semibold gap-1">
+                <button
+                  type="button"
+                  onClick={() => setAvatarMode("initials")}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    avatarMode === "initials"
+                      ? "bg-white text-gray-900 shadow-xs"
+                      : "text-gray-500 hover:text-gray-900"
+                  }`}
+                >
+                  <UserIcon size={13} className={avatarMode === "initials" ? "text-blue-600" : ""} />
+                  <span>Initials</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => setAvatarMode("preset")}
@@ -466,7 +489,7 @@ export default function RegisterPage() {
                   }`}
                 >
                   <Sparkles size={13} className={avatarMode === "preset" ? "text-blue-600" : ""} />
-                  <span>Choose Avatar</span>
+                  <span>Presets</span>
                 </button>
                 <button
                   type="button"
@@ -483,11 +506,33 @@ export default function RegisterPage() {
                   }`}
                 >
                   <Upload size={13} className={avatarMode === "custom" ? "text-blue-600" : ""} />
-                  <span>Upload Photo</span>
+                  <span>Upload</span>
                 </button>
               </div>
 
-              {/* Tab 1: Preset Avatars Grid */}
+              {/* Tab 1: Initials Mode View */}
+              {avatarMode === "initials" && (
+                <div className="pt-1">
+                  <div className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-xl">
+                    <Avatar
+                      url={null}
+                      name={displayName || username || "New User"}
+                      size={42}
+                      className="rounded-full shadow-2xs flex-shrink-0"
+                    />
+                    <div className="text-left flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-800 truncate">
+                        Initials Avatar (No Photo)
+                      </p>
+                      <p className="text-[11px] text-gray-500 leading-snug">
+                        Your profile will automatically display your colorful initials.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 2: Preset Avatars Grid */}
               {avatarMode === "preset" && (
                 <div className="pt-1">
                   <div className="grid grid-cols-4 gap-2.5 justify-items-center">
@@ -523,7 +568,7 @@ export default function RegisterPage() {
                 </div>
               )}
 
-              {/* Tab 2: Custom Photo Upload Box */}
+              {/* Tab 3: Custom Photo Upload Box */}
               {avatarMode === "custom" && (
                 <div className="pt-1">
                   {avatarPreview ? (
@@ -536,7 +581,7 @@ export default function RegisterPage() {
                           className="rounded-full border border-gray-200"
                         />
                         <div className="text-left">
-                          <p className="text-xs font-semibold text-gray-800 truncate max-w-[170px]">
+                          <p className="text-xs font-semibold text-gray-800 truncate max-w-[160px]">
                             {avatarFile?.name || "Custom image"}
                           </p>
                           <p className="text-[10px] text-gray-400">
