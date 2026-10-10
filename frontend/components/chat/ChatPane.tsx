@@ -377,7 +377,9 @@ export default function ChatPane({
               e.stopPropagation();
               onBack();
             }}
-            className="md:hidden mr-2 text-gray-600 p-2 -ml-2 rounded-full hover:bg-gray-100 transition-colors"
+            title="Back to chats"
+            aria-label="Back to chats"
+            className="md:hidden mr-2 text-gray-600 p-2 -ml-2 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
           >
             <ArrowLeft size={22} />
           </button>

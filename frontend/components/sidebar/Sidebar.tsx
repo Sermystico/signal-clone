@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Search, Edit, MoreVertical, MessageSquare } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Search, Edit, MoreVertical, MessageSquare, Users, Settings } from 'lucide-react';
 import { MockConversation } from '@/types';
 import { useAuth, User } from '@/contexts/AuthContext';
 import Avatar from '@/components/ui/Avatar';
@@ -32,7 +32,6 @@ export default function Sidebar({
   conversations,
   activeConversationId,
   onSelectConversation,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onOpenProfile,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onNewChat,
@@ -48,6 +47,22 @@ export default function Sidebar({
 }: SidebarProps) {
   const { token } = useAuth();
   const [internalView, setInternalView] = useState<'chats' | 'new_chat' | 'new_group'>('chats');
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setShowMoreMenu(false);
+      }
+    };
+    if (showMoreMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showMoreMenu]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
 
@@ -140,44 +155,79 @@ export default function Sidebar({
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-white h-[60px]">
         <div className="flex items-center gap-3">
-          {showTabsButton && (
-            <button
-              onClick={onToggleTabs}
-              title="Show tabs"
-              aria-label="Show tabs"
-              className="focus:outline-none p-2 -ml-2 rounded-lg hover:bg-gray-100 transition-colors"
+          <button
+            onClick={onToggleTabs}
+            title="Menu & Options"
+            aria-label="Menu & Options"
+            className={`focus:outline-none p-2 -ml-2 rounded-lg hover:bg-gray-100 transition-colors ${
+              showTabsButton ? 'block' : 'md:hidden block'
+            }`}
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-gray-700"
             >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-gray-700"
-              >
-                <line x1="3" y1="12" x2="21" y2="12"></line>
-                <line x1="3" y1="6" x2="21" y2="6"></line>
-                <line x1="3" y1="18" x2="21" y2="18"></line>
-              </svg>
-            </button>
-          )}
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
           <h2 className="text-xl font-bold text-gray-900 capitalize">{activeTab}</h2>
         </div>
 
         <div className="flex items-center gap-1 text-gray-600">
           <button
             onClick={() => setView('new_chat')}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors focus:outline-none"
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors focus:outline-none cursor-pointer"
             title="New Chat"
+            aria-label="New Chat"
           >
             <Edit size={20} />
           </button>
-          <button className="p-2 hover:bg-gray-100 rounded-full transition-colors" title="More options">
-            <MoreVertical size={20} />
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowMoreMenu(prev => !prev)}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors focus:outline-none cursor-pointer"
+              title="More options"
+              aria-label="More options"
+            >
+              <MoreVertical size={20} />
+            </button>
+            {showMoreMenu && (
+              <div
+                ref={moreMenuRef}
+                className="absolute right-0 top-full mt-1 w-44 bg-white rounded-xl shadow-lg border border-gray-200 py-1.5 z-50 text-[14px] animate-in fade-in zoom-in-95 duration-100"
+              >
+                <button
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    setView('new_group');
+                  }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2 hover:bg-gray-100 text-gray-700 text-left transition-colors cursor-pointer"
+                >
+                  <Users size={16} />
+                  <span>New group</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    onOpenProfile();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2 hover:bg-gray-100 text-gray-700 text-left transition-colors cursor-pointer"
+                >
+                  <Settings size={16} />
+                  <span>Settings</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

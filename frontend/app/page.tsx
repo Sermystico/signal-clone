@@ -8,8 +8,9 @@ import ProfileModal from "@/components/profile/ProfileModal";
 import NewChatModal from "@/components/chat/NewChatModal";
 import GroupDetailsModal from "@/components/chat/GroupDetailsModal";
 import { MockConversation, MockMessage, MessageStatus } from "@/types";
-import { Menu, MessageCircle, Phone, Settings } from "lucide-react";
+import { Menu, MessageCircle, Phone, Settings, X, Edit, Users, LogOut } from "lucide-react";
 import StoriesIcon from "@/components/icons/StoriesIcon";
+import Avatar from "@/components/ui/Avatar";
 
 interface APIMessage {
   id: number;
@@ -109,10 +110,32 @@ export default function Home() {
   const [showNewChat, setShowNewChat] = useState(false);
   const [showGroupDetails, setShowGroupDetails] = useState(false);
   const [showTabs, setShowTabs] = useState(true);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('chats');
   const [navToast, setNavToast] = useState<string | null>(null);
   const [localAvatarUrl, setLocalAvatarUrl] = useState<string | null | undefined>(undefined);
   const wsRef = useRef<WebSocket | null>(null);
+
+  // Close mobile drawer on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setMobileDrawerOpen(false);
+      }
+    };
+    if (mobileDrawerOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mobileDrawerOpen]);
+
+  const handleToggleTabs = useCallback(() => {
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      setShowTabs(prev => !prev);
+    } else {
+      setMobileDrawerOpen(true);
+    }
+  }, []);
 
   // Sync conversation selection with browser history state
   const handleSelectConversation = useCallback((id: number | string | null) => {
@@ -563,9 +586,157 @@ export default function Home() {
           onGroupCreated={handleGroupCreated}
           onStartChat={handleStartChat}
           showTabsButton={!showTabs}
-          onToggleTabs={() => setShowTabs(true)}
+          onToggleTabs={handleToggleTabs}
         />
       </div>
+
+      {/* Mobile / Split-Screen Navigation Drawer */}
+      {mobileDrawerOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex animate-in fade-in duration-200">
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
+            onClick={() => setMobileDrawerOpen(false)}
+          />
+          
+          {/* Drawer Panel */}
+          <div className="relative w-[280px] sm:w-[320px] max-w-[85vw] bg-white h-full shadow-2xl flex flex-col z-10 animate-in slide-in-from-left duration-200">
+            {/* Drawer Header with User Profile */}
+            <div className="p-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+              <div 
+                className="flex items-center gap-3 cursor-pointer min-w-0 flex-1 mr-2"
+                onClick={() => {
+                  setMobileDrawerOpen(false);
+                  setShowProfile(true);
+                }}
+              >
+                <Avatar url={userWithAvatar.avatar_url} name={userWithAvatar.display_name} size={44} />
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-semibold text-gray-900 text-[15px] truncate">
+                    {userWithAvatar.display_name}
+                  </h3>
+                  <p className="text-[13px] text-gray-500 truncate">
+                    {userWithAvatar.phone || `@${userWithAvatar.username}`}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setMobileDrawerOpen(false)}
+                className="p-1.5 hover:bg-gray-200 rounded-full text-gray-500 transition-colors cursor-pointer"
+                title="Close menu"
+                aria-label="Close menu"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            {/* Drawer Menu Items */}
+            <div className="flex-1 overflow-y-auto py-2 px-3 space-y-1">
+              {/* Chats */}
+              <button
+                onClick={() => {
+                  setActiveTab('chats');
+                  setSidebarView('chats');
+                  setMobileDrawerOpen(false);
+                }}
+                className={`w-full flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-[15px] font-medium transition-colors cursor-pointer ${
+                  activeTab === 'chats' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <MessageCircle size={20} />
+                <span className="flex-1 text-left">Chats</span>
+                {conversations.reduce((acc, c) => acc + (c.unreadCount || 0), 0) > 0 && (
+                  <span className="bg-blue-600 text-white text-[12px] font-bold px-2 py-0.5 rounded-full">
+                    {conversations.reduce((acc, c) => acc + (c.unreadCount || 0), 0)}
+                  </span>
+                )}
+              </button>
+              
+              {/* Calls */}
+              <button
+                onClick={() => {
+                  setMobileDrawerOpen(false);
+                  setNavToast('Calls - Coming Soon');
+                }}
+                className="w-full flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-[15px] font-medium text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                <Phone size={20} />
+                <span className="flex-1 text-left">Calls</span>
+                <span className="text-[11px] font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Soon</span>
+              </button>
+              
+              {/* Stories */}
+              <button
+                onClick={() => {
+                  setMobileDrawerOpen(false);
+                  setNavToast('Stories - Coming Soon');
+                }}
+                className="w-full flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-[15px] font-medium text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                <StoriesIcon size={20} />
+                <span className="flex-1 text-left">Stories</span>
+                <span className="text-[11px] font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Soon</span>
+              </button>
+
+              <hr className="my-2 border-gray-200" />
+              
+              {/* New Chat */}
+              <button
+                onClick={() => {
+                  setMobileDrawerOpen(false);
+                  setActiveId(null);
+                  setSidebarView('new_chat');
+                }}
+                className="w-full flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-[15px] font-medium text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                <Edit size={20} />
+                <span className="flex-1 text-left">New Chat</span>
+              </button>
+
+              {/* New Group */}
+              <button
+                onClick={() => {
+                  setMobileDrawerOpen(false);
+                  setActiveId(null);
+                  setSidebarView('new_group');
+                }}
+                className="w-full flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-[15px] font-medium text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                <Users size={20} />
+                <span className="flex-1 text-left">New Group</span>
+              </button>
+
+              <hr className="my-2 border-gray-200" />
+
+              {/* Settings / Profile */}
+              <button
+                onClick={() => {
+                  setMobileDrawerOpen(false);
+                  setShowProfile(true);
+                }}
+                className="w-full flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-[15px] font-medium text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                <Settings size={20} />
+                <span className="flex-1 text-left">Settings</span>
+              </button>
+            </div>
+            
+            {/* Drawer Footer with Logout */}
+            <div className="p-3 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={() => {
+                  setMobileDrawerOpen(false);
+                  logout();
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[14px] font-medium text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+              >
+                <LogOut size={18} />
+                <span>Log Out</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Center Chat Pane */}
       <div className={`${!activeId ? 'hidden md:flex' : 'flex'} flex-1 h-full min-w-0`}>
