@@ -25,7 +25,7 @@ A full-stack, real-time messaging web application engineered with pixel-level fi
 - **Language:** TypeScript
 - **Styling:** Vanilla CSS & Tailwind CSS (Custom HSL palette, Glassmorphism, Signal Dark/Light themes, Responsive layouts)
 - **Icons:** Lucide React & Custom Signal SVGs (Stories segmented icon)
-- **Avatars:** Dynamic LoremFaces Avatar Generator
+- **Avatars:** Dynamic OpenPeeps Hand-Drawn Avatar Generator (DiceBear)
 
 ### Backend
 - **Framework:** FastAPI (Python 3.12+)

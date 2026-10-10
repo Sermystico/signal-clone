@@ -8,11 +8,11 @@ def seed_db():
     
     db = SessionLocal()
     
-    # Ensure/update existing users with modern LoremFaces avatars if needed
+    # Ensure/update existing users with modern OpenPeeps avatars if needed
     for u in db.query(models.User).all():
-        if not u.avatar_url or "pravatar" in u.avatar_url or "dicebear" in u.avatar_url or "bottts" in u.avatar_url:
-            face_id = (sum(ord(c) for c in u.username) % 5) + 1
-            u.avatar_url = f"https://www.loremfaces.net/128/id/{face_id}.jpg"
+        if not u.avatar_url or "loremfaces" in u.avatar_url or "pravatar" in u.avatar_url or "bottts" in u.avatar_url:
+            seed_name = u.display_name or u.username or "User"
+            u.avatar_url = f"https://api.dicebear.com/7.x/open-peeps/svg?seed={seed_name}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf"
     db.commit()
 
     if db.query(models.User).first():
@@ -21,9 +21,9 @@ def seed_db():
         return
 
     # Seed Demo Users
-    user1 = models.User(username="alice", phone="+919876500001", display_name="Alice", avatar_url="https://www.loremfaces.net/128/id/1.jpg")
-    user2 = models.User(username="bob", phone="+919876500002", display_name="Bob", avatar_url="https://www.loremfaces.net/128/id/2.jpg")
-    user3 = models.User(username="charlie", phone="+919876500003", display_name="Charlie", avatar_url="https://www.loremfaces.net/128/id/3.jpg")
+    user1 = models.User(username="alice", phone="+919876500001", display_name="Alice", avatar_url="https://api.dicebear.com/7.x/open-peeps/svg?seed=Alice&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf")
+    user2 = models.User(username="bob", phone="+919876500002", display_name="Bob", avatar_url="https://api.dicebear.com/7.x/open-peeps/svg?seed=Bob&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf")
+    user3 = models.User(username="charlie", phone="+919876500003", display_name="Charlie", avatar_url="https://api.dicebear.com/7.x/open-peeps/svg?seed=Charlie&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf")
     
     db.add_all([user1, user2, user3])
     db.commit()

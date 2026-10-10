@@ -19,14 +19,14 @@ const COUNTRY_CODES = [
 ];
 
 const PRESET_AVATARS = [
-  { id: 1, url: "https://www.loremfaces.net/128/id/1.jpg", label: "Avatar 1" },
-  { id: 2, url: "https://www.loremfaces.net/128/id/2.jpg", label: "Avatar 2" },
-  { id: 3, url: "https://www.loremfaces.net/128/id/3.jpg", label: "Avatar 3" },
-  { id: 4, url: "https://www.loremfaces.net/128/id/4.jpg", label: "Avatar 4" },
-  { id: 5, url: "https://www.loremfaces.net/128/id/5.jpg", label: "Avatar 5" },
-  { id: 6, url: "https://www.loremfaces.net/128/id/6.jpg", label: "Avatar 6" },
-  { id: 7, url: "https://www.loremfaces.net/128/id/7.jpg", label: "Avatar 7" },
-  { id: 8, url: "https://www.loremfaces.net/128/id/8.jpg", label: "Avatar 8" },
+  { id: 1, url: "https://api.dicebear.com/7.x/open-peeps/svg?seed=Felix&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf", label: "Felix" },
+  { id: 2, url: "https://api.dicebear.com/7.x/open-peeps/svg?seed=Aneka&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf", label: "Aneka" },
+  { id: 3, url: "https://api.dicebear.com/7.x/open-peeps/svg?seed=Milo&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf", label: "Milo" },
+  { id: 4, url: "https://api.dicebear.com/7.x/open-peeps/svg?seed=Bella&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf", label: "Bella" },
+  { id: 5, url: "https://api.dicebear.com/7.x/open-peeps/svg?seed=Leo&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf", label: "Leo" },
+  { id: 6, url: "https://api.dicebear.com/7.x/open-peeps/svg?seed=Zoe&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf", label: "Zoe" },
+  { id: 7, url: "https://api.dicebear.com/7.x/open-peeps/svg?seed=Jasper&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf", label: "Jasper" },
+  { id: 8, url: "https://api.dicebear.com/7.x/open-peeps/svg?seed=Maya&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf", label: "Maya" },
 ];
 
 export default function RegisterPage() {
